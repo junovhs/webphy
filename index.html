@@ -52,14 +52,16 @@
                     message.innerHTML = `Processing: ${Math.round(progress * 100)}%`;
                 });
 
-                const coreURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-                const ffmpegURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
-
+                // Define base URLs for clarity
+                const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+                
+                // Load all necessary files using Blob URLs to bypass cross-origin restrictions
                 await ffmpeg.load({
-                    coreURL: await toBlobURL(`${coreURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${coreURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                    // THIS IS THE FIX: Explicitly load the worker from a Blob URL.
-                    workerURL: await toBlobURL(`${ffmpegURL}/worker.js`, 'text/javascript'),
+                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    // THE CORRECTED LINE: The worker is part of the main ffmpeg package, not the core package.
+                    // And it must be loaded from its ESM distribution path.
+                    workerURL: await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js', 'text/javascript'),
                 });
 
                 message.textContent = 'FFmpeg Loaded! Please select an MP4 file.';
