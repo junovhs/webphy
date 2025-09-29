@@ -14,8 +14,8 @@
         button { padding: 10px 20px; font-size: 16px; border-radius: 6px; border: none; cursor: pointer; background-color: #007bff; color: white; }
     </style>
 
-    <!-- Load the UMD script from the CDN. This script will create the global FFmpeg object. -->
-    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+    <!-- Load the self-hosted UMD script. -->
+    <script src="/ffmpeg.js"></script>
 </head>
 <body>
 
@@ -37,7 +37,7 @@
             const downloadLink = document.getElementById('download-link');
             const loadBtn = document.getElementById('load-btn');
             
-            // Fixed: Use FFmpegWASM global
+            // Use FFmpegWASM global
             const { FFmpeg, fetchFile } = window.FFmpegWASM;
             let ffmpeg = null;
 
@@ -53,12 +53,26 @@
                         message.innerHTML = `Processing: ${Math.round(progress * 100)}%`;
                     });
 
-                    // Fixed: Match core version
+                    // Load self-hosted assets to avoid CORS
                     await ffmpeg.load({
-                        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js'
+                        coreURL: '/ffmpeg-core.js',
+                        wasmURL: '/ffmpeg-core.wasm',
+                        workerURL: '/814.ffmpeg.js'
                     });
 
                     message.textContent = 'FFmpeg Loaded! Please select an MP4 file.';
+                    // Show file input (label it for UX)
+                    const fileLabel = document.createElement('label');
+                    fileLabel.htmlFor = 'uploader';
+                    fileLabel.textContent = 'Select MP4 File';
+                    fileLabel.style.display = 'block';
+                    fileLabel.style.padding = '10px 20px';
+                    fileLabel.style.backgroundColor = '#6c757d';
+                    fileLabel.style.color = 'white';
+                    fileLabel.style.borderRadius = '6px';
+                    fileLabel.style.cursor = 'pointer';
+                    fileLabel.style.margin = '20px 0';
+                    uploader.parentNode.insertBefore(fileLabel, uploader.nextSibling);
                     uploader.style.display = 'block';
                 } catch (error) {
                     message.textContent = 'Error loading FFmpeg. Check console for details.';
@@ -77,7 +91,7 @@
                 try {
                     await ffmpeg.writeFile(videoFile.name, await fetchFile(videoFile));
                     message.textContent = 'Starting conversion...';
-                    // Fixed: Correct codec name
+                    // Correct codec: libmp3lame for MP3
                     await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', '-q:a', '2', 'output.mp3']);
 
                     message.textContent = 'Conversion complete!';
@@ -86,7 +100,7 @@
                     
                     downloadLink.href = mp3Url;
                     downloadLink.style.display = 'inline-block';
-                    // Cleanup on download
+                    // Cleanup URL after download
                     downloadLink.addEventListener('click', () => URL.revokeObjectURL(mp3Url), { once: true });
                     uploader.style.display = 'block';
                 } catch (error) {
