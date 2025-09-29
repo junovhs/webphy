@@ -31,15 +31,14 @@
     </div>
 
     <script>
-        // THIS IS THE FIX: Wait for the entire HTML document to be loaded and parsed.
         document.addEventListener('DOMContentLoaded', () => {
             const uploader = document.getElementById('uploader');
             const message = document.getElementById('message');
             const downloadLink = document.getElementById('download-link');
             const loadBtn = document.getElementById('load-btn');
             
-            // Now it is safe to access window.FFmpeg because the external script has loaded.
-            const { FFmpeg, fetchFile } = window.FFmpeg;
+            // Fixed: Use FFmpegWASM global
+            const { FFmpeg, fetchFile } = window.FFmpegWASM;
             let ffmpeg = null;
 
             loadBtn.addEventListener('click', async () => {
@@ -54,9 +53,9 @@
                         message.innerHTML = `Processing: ${Math.round(progress * 100)}%`;
                     });
 
-                    // Load the UMD version of the core.
+                    // Fixed: Match core version
                     await ffmpeg.load({
-                        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
+                        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js'
                     });
 
                     message.textContent = 'FFmpeg Loaded! Please select an MP4 file.';
@@ -64,6 +63,7 @@
                 } catch (error) {
                     message.textContent = 'Error loading FFmpeg. Check console for details.';
                     console.error(error);
+                    loadBtn.style.display = 'inline-block'; // Allow retry
                 }
             });
 
@@ -74,17 +74,26 @@
                 uploader.style.display = 'none';
                 downloadLink.style.display = 'none';
 
-                await ffmpeg.writeFile(videoFile.name, await fetchFile(videoFile));
-                message.textContent = 'Starting conversion...';
-                await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmprime', '-q:a', '2', 'output.mp3']);
+                try {
+                    await ffmpeg.writeFile(videoFile.name, await fetchFile(videoFile));
+                    message.textContent = 'Starting conversion...';
+                    // Fixed: Correct codec name
+                    await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', '-q:a', '2', 'output.mp3']);
 
-                message.textContent = 'Conversion complete!';
-                const data = await ffmpeg.readFile('output.mp3');
-                const mp3Url = URL.createObjectURL(new Blob([data.buffer], { type: 'audio/mpeg' }));
-                
-                downloadLink.href = mp3Url;
-                downloadLink.style.display = 'inline-block';
-                uploader.style.display = 'block';
+                    message.textContent = 'Conversion complete!';
+                    const data = await ffmpeg.readFile('output.mp3');
+                    const mp3Url = URL.createObjectURL(new Blob([data.buffer], { type: 'audio/mpeg' }));
+                    
+                    downloadLink.href = mp3Url;
+                    downloadLink.style.display = 'inline-block';
+                    // Cleanup on download
+                    downloadLink.addEventListener('click', () => URL.revokeObjectURL(mp3Url), { once: true });
+                    uploader.style.display = 'block';
+                } catch (error) {
+                    message.textContent = 'Conversion failed. Check console.';
+                    console.error(error);
+                    uploader.style.display = 'block';
+                }
             };
 
             uploader.addEventListener('change', (event) => {
