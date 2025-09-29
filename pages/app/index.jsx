@@ -79,7 +79,9 @@ const App = () => {
       setSpinning(true);
       try {
         await ffmpeg.load({
-          coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js',
+          coreURL: '/ffmpeg-core.js',
+          wasmURL: '/ffmpeg-core.wasm',
+          workerURL: '/ffmpeg-worker.js'  // Optional: Add if you download it
         });
         setSpinning(false);
         setTip("Ready! Upload an MP4 to convert to MP3.");
