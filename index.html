@@ -9,12 +9,13 @@
         .container { background-color: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); text-align: center; width: 90%; max-width: 450px; }
         h1 { font-size: 24px; margin-bottom: 20px; color: #1c1e21; }
         #uploader { margin: 20px 0; }
-        #message { font-weight: 500; color: #606770; min-height: 24px; transition: color 0.3s; }
-        #download-link { display: none; margin-top: 20px; padding: 12px 24px; background-color: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; transition: background-color 0.2s; }
-        #download-link:hover { background-color: #218838; }
+        #message { font-weight: 500; color: #606770; min-height: 24px; }
+        #download-link { display: none; margin-top: 20px; padding: 12px 24px; background-color: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; }
         button { padding: 10px 20px; font-size: 16px; border-radius: 6px; border: none; cursor: pointer; background-color: #007bff; color: white; }
-        button:disabled { background-color: #a0cffc; cursor: not-allowed; }
     </style>
+
+    <!-- STEP 1: Load the UMD version of the script. This creates a global FFmpeg object. -->
+    <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
 </head>
 <body>
 
@@ -29,15 +30,15 @@
         <a id="download-link" download="output.mp3">Download MP3</a>
     </div>
 
-    <script type="module">
-        import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
-        import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
-
+    <!-- STEP 2: Use a standard script tag, NOT type="module" -->
+    <script>
         const uploader = document.getElementById('uploader');
         const message = document.getElementById('message');
         const downloadLink = document.getElementById('download-link');
         const loadBtn = document.getElementById('load-btn');
         
+        // STEP 3: Access everything from the global FFmpeg object created by the script tag.
+        const { FFmpeg, fetchFile } = window.FFmpeg;
         let ffmpeg = null;
 
         loadBtn.addEventListener('click', async () => {
@@ -52,16 +53,9 @@
                     message.innerHTML = `Processing: ${Math.round(progress * 100)}%`;
                 });
 
-                // Define base URLs for clarity
-                const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-                
-                // Load all necessary files using Blob URLs to bypass cross-origin restrictions
+                // STEP 4: Load the UMD version of the core. No workerURL is needed.
                 await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
-                    // THE CORRECTED LINE: The worker is part of the main ffmpeg package, not the core package.
-                    // And it must be loaded from its ESM distribution path.
-                    workerURL: await toBlobURL('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js', 'text/javascript'),
+                    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
                 });
 
                 message.textContent = 'FFmpeg Loaded! Please select an MP4 file.';
