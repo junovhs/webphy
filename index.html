@@ -30,8 +30,6 @@
     </div>
 
     <script type="module">
-        // Import FFmpeg and utilities directly from the CDN as ES Modules
-        // This is the modern way and prevents "FFmpeg is not defined" errors.
         import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/+esm';
         import { fetchFile, toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/+esm';
 
@@ -40,9 +38,8 @@
         const downloadLink = document.getElementById('download-link');
         const loadBtn = document.getElementById('load-btn');
         
-        let ffmpeg = null; // We will initialize it when the user clicks the button.
+        let ffmpeg = null;
 
-        // Load FFmpeg when the user clicks the button
         loadBtn.addEventListener('click', async () => {
             loadBtn.style.display = 'none';
             message.textContent = 'Loading FFmpeg library... please wait.';
@@ -50,44 +47,37 @@
             try {
                 ffmpeg = new FFmpeg();
                 
-                ffmpeg.on('log', ({ message: logMessage }) => {
-                    console.log(logMessage); // For debugging
-                });
-
+                ffmpeg.on('log', ({ message: logMessage }) => console.log(logMessage));
                 ffmpeg.on('progress', ({ progress }) => {
-                    const percentage = Math.round(progress * 100);
-                    message.innerHTML = `Processing: ${percentage}%`;
+                    message.innerHTML = `Processing: ${Math.round(progress * 100)}%`;
                 });
 
-                // Use the single-thread version, which works everywhere without special headers.
-                const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+                const coreURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+                const ffmpegURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm';
 
                 await ffmpeg.load({
-                    coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-                    wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+                    coreURL: await toBlobURL(`${coreURL}/ffmpeg-core.js`, 'text/javascript'),
+                    wasmURL: await toBlobURL(`${coreURL}/ffmpeg-core.wasm`, 'application/wasm'),
+                    // THIS IS THE FIX: Explicitly load the worker from a Blob URL.
+                    workerURL: await toBlobURL(`${ffmpegURL}/worker.js`, 'text/javascript'),
                 });
 
                 message.textContent = 'FFmpeg Loaded! Please select an MP4 file.';
-                uploader.style.display = 'block'; // Show the file input
+                uploader.style.display = 'block';
             } catch (error) {
                 message.textContent = 'Error loading FFmpeg. Check console for details.';
                 console.error(error);
             }
         });
 
-        // The main conversion function
         const convertToMp3 = async (videoFile) => {
-            if (!ffmpeg) {
-                message.textContent = 'FFmpeg is not loaded yet.';
-                return;
-            }
+            if (!ffmpeg) return;
 
             message.textContent = 'Reading file...';
-            uploader.style.display = 'none'; // Hide uploader during processing
-            downloadLink.style.display = 'none'; // Hide old download link
+            uploader.style.display = 'none';
+            downloadLink.style.display = 'none';
 
             await ffmpeg.writeFile(videoFile.name, await fetchFile(videoFile));
-
             message.textContent = 'Starting conversion...';
             await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', '-q:a', '2', 'output.mp3']);
 
@@ -97,15 +87,12 @@
             
             downloadLink.href = mp3Url;
             downloadLink.style.display = 'inline-block';
-            uploader.style.display = 'block'; // Show uploader again
+            uploader.style.display = 'block';
         };
 
-        // Listen for the user selecting a file
-        uploader.addEventListener('change', async (event) => {
+        uploader.addEventListener('change', (event) => {
             const videoFile = event.target.files[0];
-            if (videoFile) {
-                await convertToMp3(videoFile);
-            }
+            if (videoFile) convertToMp3(videoFile);
         });
     </script>
 </body>
