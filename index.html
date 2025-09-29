@@ -14,7 +14,7 @@
         button { padding: 10px 20px; font-size: 16px; border-radius: 6px; border: none; cursor: pointer; background-color: #007bff; color: white; }
     </style>
 
-    <!-- STEP 1: Load the UMD version of the script. This creates a global FFmpeg object. -->
+    <!-- Load the UMD script from the CDN. This script will create the global FFmpeg object. -->
     <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
 </head>
 <body>
@@ -30,65 +30,67 @@
         <a id="download-link" download="output.mp3">Download MP3</a>
     </div>
 
-    <!-- STEP 2: Use a standard script tag, NOT type="module" -->
     <script>
-        const uploader = document.getElementById('uploader');
-        const message = document.getElementById('message');
-        const downloadLink = document.getElementById('download-link');
-        const loadBtn = document.getElementById('load-btn');
-        
-        // STEP 3: Access everything from the global FFmpeg object created by the script tag.
-        const { FFmpeg, fetchFile } = window.FFmpeg;
-        let ffmpeg = null;
-
-        loadBtn.addEventListener('click', async () => {
-            loadBtn.style.display = 'none';
-            message.textContent = 'Loading FFmpeg library... please wait.';
-
-            try {
-                ffmpeg = new FFmpeg();
-                
-                ffmpeg.on('log', ({ message: logMessage }) => console.log(logMessage));
-                ffmpeg.on('progress', ({ progress }) => {
-                    message.innerHTML = `Processing: ${Math.round(progress * 100)}%`;
-                });
-
-                // STEP 4: Load the UMD version of the core. No workerURL is needed.
-                await ffmpeg.load({
-                    coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
-                });
-
-                message.textContent = 'FFmpeg Loaded! Please select an MP4 file.';
-                uploader.style.display = 'block';
-            } catch (error) {
-                message.textContent = 'Error loading FFmpeg. Check console for details.';
-                console.error(error);
-            }
-        });
-
-        const convertToMp3 = async (videoFile) => {
-            if (!ffmpeg) return;
-
-            message.textContent = 'Reading file...';
-            uploader.style.display = 'none';
-            downloadLink.style.display = 'none';
-
-            await ffmpeg.writeFile(videoFile.name, await fetchFile(videoFile));
-            message.textContent = 'Starting conversion...';
-            await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmp3lame', '-q:a', '2', 'output.mp3']);
-
-            message.textContent = 'Conversion complete!';
-            const data = await ffmpeg.readFile('output.mp3');
-            const mp3Url = URL.createObjectURL(new Blob([data.buffer], { type: 'audio/mpeg' }));
+        // THIS IS THE FIX: Wait for the entire HTML document to be loaded and parsed.
+        document.addEventListener('DOMContentLoaded', () => {
+            const uploader = document.getElementById('uploader');
+            const message = document.getElementById('message');
+            const downloadLink = document.getElementById('download-link');
+            const loadBtn = document.getElementById('load-btn');
             
-            downloadLink.href = mp3Url;
-            downloadLink.style.display = 'inline-block';
-            uploader.style.display = 'block';
-        };
+            // Now it is safe to access window.FFmpeg because the external script has loaded.
+            const { FFmpeg, fetchFile } = window.FFmpeg;
+            let ffmpeg = null;
 
-        uploader.addEventListener('change', (event) => {
-            const videoFile = event.target.files[0];
-            if (videoFile) convertToMp3(videoFile);
+            loadBtn.addEventListener('click', async () => {
+                loadBtn.style.display = 'none';
+                message.textContent = 'Loading FFmpeg library... please wait.';
+
+                try {
+                    ffmpeg = new FFmpeg();
+                    
+                    ffmpeg.on('log', ({ message: logMessage }) => console.log(logMessage));
+                    ffmpeg.on('progress', ({ progress }) => {
+                        message.innerHTML = `Processing: ${Math.round(progress * 100)}%`;
+                    });
+
+                    // Load the UMD version of the core.
+                    await ffmpeg.load({
+                        coreURL: 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js'
+                    });
+
+                    message.textContent = 'FFmpeg Loaded! Please select an MP4 file.';
+                    uploader.style.display = 'block';
+                } catch (error) {
+                    message.textContent = 'Error loading FFmpeg. Check console for details.';
+                    console.error(error);
+                }
+            });
+
+            const convertToMp3 = async (videoFile) => {
+                if (!ffmpeg) return;
+
+                message.textContent = 'Reading file...';
+                uploader.style.display = 'none';
+                downloadLink.style.display = 'none';
+
+                await ffmpeg.writeFile(videoFile.name, await fetchFile(videoFile));
+                message.textContent = 'Starting conversion...';
+                await ffmpeg.exec(['-i', videoFile.name, '-vn', '-acodec', 'libmprime', '-q:a', '2', 'output.mp3']);
+
+                message.textContent = 'Conversion complete!';
+                const data = await ffmpeg.readFile('output.mp3');
+                const mp3Url = URL.createObjectURL(new Blob([data.buffer], { type: 'audio/mpeg' }));
+                
+                downloadLink.href = mp3Url;
+                downloadLink.style.display = 'inline-block';
+                uploader.style.display = 'block';
+            };
+
+            uploader.addEventListener('change', (event) => {
+                const videoFile = event.target.files[0];
+                if (videoFile) convertToMp3(videoFile);
+            });
         });
     </script>
 </body>
