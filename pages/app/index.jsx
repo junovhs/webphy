@@ -1,10 +1,10 @@
 import { Spin, Upload, Button, message } from "antd";
 import { useEffect, useRef, useState } from "react";
-import { createFFmpeg, fetchFile } from "@ffmpeg/ffmpeg";
+import { FFmpeg } from "@ffmpeg/ffmpeg";
+import { fetchFile } from "@ffmpeg/util";
 import { InboxOutlined } from "@ant-design/icons";
 import { fileTypeFromBuffer } from "file-type";
 import { Analytics } from "@vercel/analytics/react";
-import numerify from "numerify/lib/index.cjs";
 
 const { Dragger } = Upload;
 
@@ -16,11 +16,11 @@ const App = () => {
   const [name, setName] = useState("input.mp4");
   const [href, setHref] = useState("");
   const [downloadFileName, setDownloadFileName] = useState("output.mp3");
-  const ffmpeg = useRef();
+  const ffmpegRef = useRef(null);
 
   const handleExec = async () => {
-    if (!file) {
-      message.error("Please select an MP4 file first.");
+    if (!file || !ffmpegRef.current) {
+      message.error("Please select an MP4 file first and wait for FFmpeg to load.");
       return;
     }
     setHref("");
@@ -28,21 +28,18 @@ const App = () => {
     try {
       setTip("Loading file into browser");
       setSpinning(true);
-      ffmpeg.current.FS("writeFile", name, await fetchFile(file));
+      await ffmpegRef.current.writeFile(name, await fetchFile(file));
       setTip("Starting conversion to MP3...");
       // Hardcoded MP3 conversion: extract audio only, high quality MP3
-      await ffmpeg.current.run(
-        "-i",
-        name,
+      await ffmpegRef.current.exec([
+        "-i", name,
         "-vn", // No video
-        "-acodec",
-        "libmp3lame",
-        "-q:a",
-        "2", // High quality (VBR ~190kbps)
+        "-acodec", "libmp3lame",
+        "-q:a", "2", // High quality (VBR ~190kbps)
         "output.mp3"
-      );
-      setSpinning(false);
-      const data = ffmpeg.current.FS("readFile", "output.mp3");
+      ]);
+      setTip("Generating download...");
+      const data = await ffmpegRef.current.readFile("output.mp3");
       const type = await fileTypeFromBuffer(data.buffer);
 
       const objectURL = URL.createObjectURL(
@@ -50,6 +47,7 @@ const App = () => {
       );
       setHref(objectURL);
       setDownloadFileName("output.mp3");
+      setSpinning(false);
       message.success(
         "Conversion successful! Click the download button to get your MP3.",
         10
@@ -66,19 +64,30 @@ const App = () => {
 
   useEffect(() => {
     (async () => {
-      ffmpeg.current = createFFmpeg({
-        log: true,
-        corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js',
+      const ffmpeg = new FFmpeg();
+      ffmpegRef.current = ffmpeg;
+
+      ffmpeg.on("log", ({ message: logMessage }) => {
+        console.log(logMessage);
       });
-      ffmpeg.current.setProgress(({ ratio }) => {
-        console.log(ratio);
-        setTip(numerify(ratio, "0.0%"));
+      ffmpeg.on("progress", ({ progress }) => {
+        console.log("Progress: " + Math.round(progress * 100) + "%");
+        setTip("Converting: " + Math.round(progress * 100) + "%");
       });
+
       setTip("Loading FFmpeg library (~31MB)...");
       setSpinning(true);
-      await ffmpeg.current.load();
-      setSpinning(false);
-      setTip("Ready! Upload an MP4 to convert to MP3.");
+      try {
+        await ffmpeg.load({
+          coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/umd/ffmpeg-core.js',
+        });
+        setSpinning(false);
+        setTip("Ready! Upload an MP4 to convert to MP3.");
+      } catch (error) {
+        console.error("FFmpeg load failed:", error);
+        setSpinning(false);
+        message.error("Failed to load FFmpeg. Check console.");
+      }
     })();
   }, []);
 
