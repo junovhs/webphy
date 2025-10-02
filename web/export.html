@@ -1,0 +1,15 @@
+<!-- webphy/web/export.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Headless Export Renderer</title>
+</head>
+<body>
+    <!-- This canvas is used by WebGL but is never displayed -->
+    <canvas id="gl-export"></canvas>
+    
+    <!-- We need to load the renderer logic into this hidden window -->
+    <script type="module" src="renderer-export.js"></script>
+</body>
+</html>

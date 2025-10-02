@@ -1,110 +1,120 @@
 // webphy/web/export-video.js
 
-/**
- * Renders every frame of a video through the WebGL canvas and sends it
- * to the Electron main process for encoding. This new version uses a more
- * stable, single-frame processing loop to prevent browser/GPU crashes and slowdowns.
- */
 export async function exportVideoFrameSequence(api, canvas, videoElement, overlayElement, textElement) {
   if (document.hidden) {
-    throw new Error('Export cancelled: Page is not visible.');
+    console.warn("Export started while tab is in the background. It will continue, but performance may be impacted.");
   }
 
-  // --- 1. Initialization Phase ---
+  // --- 1. Initialization ---
   overlayElement.classList.remove('hidden');
   textElement.textContent = 'Initializing Export...';
 
   const TARGET_FPS = 30;
   const totalFrames = Math.floor(videoElement.duration * TARGET_FPS);
+  const gl = api.getGL();
 
   const initResult = await window.electronAPI.exportVideoInitialize();
   if (initResult.cancelled) throw new Error('Export cancelled');
-  if (!initResult.success) throw new Error(initResult.error || 'Failed to initialize export.');
+  if (!initResult.success) throw new Error(initResult.error || 'Failed to initialize.');
 
-  // Save video state
+  // Create our CPU workhorse
+  const encoderWorker = new Worker('frame-encoder.worker.js');
+
   const wasPaused = videoElement.paused;
   const wasTime = videoElement.currentTime;
   videoElement.pause();
   videoElement.currentTime = 0;
-  await new Promise(resolve => videoElement.addEventListener('seeked', resolve, { once: true }));
+  await new Promise(r => videoElement.addEventListener('seeked', r, { once: true }));
 
-  // For stable ETA calculation
   const frameDurations = [];
-  const ROLLING_AVERAGE_FRAMES = 20;
+  const ROLLING_AVERAGE_FRAMES = 30;
 
   return new Promise((resolve, reject) => {
     let currentFrame = 0;
+    let framesInFlight = 0; // Track how many frames are being processed by the worker
 
-    // This function processes ONE frame and then schedules the next one.
-    // This is the key to stability.
+    // This listener handles encoded frames coming BACK from the worker
+    encoderWorker.onmessage = (event) => {
+      const { frameIndex, arrayBuffer, error } = event.data;
+      framesInFlight--;
+
+      if (error) {
+        reject(new Error(`Worker failed on frame ${frameIndex}: ${error}`));
+        return;
+      }
+
+      // Send the finished WebP data to the main process for saving
+      window.electronAPI.exportVideoWriteFrame({ frameIndex, frameBuffer: arrayBuffer });
+    };
+
     const processSingleFrame = async () => {
       try {
         const frameStartTime = performance.now();
 
-        // A. Set video time and wait for it to seek
         videoElement.currentTime = currentFrame / TARGET_FPS;
         await new Promise(r => videoElement.addEventListener('seeked', r, { once: true }));
 
-        // B. Render the frame with all WebGL effects
         await api.renderCurrentFrame();
-        await new Promise(r => requestAnimationFrame(r)); // Wait for paint
 
-        // C. Get frame data as an efficient, asynchronous Blob
-        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-        const frameBuffer = await blob.arrayBuffer();
-        
-        // D. Send the raw binary data to the main process
-        window.electronAPI.exportVideoWriteFrame({ frameIndex: currentFrame, frameBuffer });
+        // This is the GPU -> CPU data transfer. It's fast.
+        const pixelData = new Uint8Array(canvas.width * canvas.height * 4);
+        gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixelData);
 
-        // E. Update progress with a stable rolling-average ETA
+        // Offload the expensive encoding work to the worker.
+        // The `[pixelData.buffer]` part transfers memory ownership instantly.
+        encoderWorker.postMessage({
+          frameIndex: currentFrame,
+          width: canvas.width,
+          height: canvas.height,
+          pixelData: pixelData,
+        }, [pixelData.buffer]);
+        framesInFlight++;
+
         const frameTime = performance.now() - frameStartTime;
         frameDurations.push(frameTime);
-        if (frameDurations.length > ROLLING_AVERAGE_FRAMES) {
-          frameDurations.shift(); // Keep the array size fixed
-        }
+        if (frameDurations.length > ROLLING_AVERAGE_FRAMES) frameDurations.shift();
         
         const avgFrameTime = frameDurations.reduce((a, b) => a + b, 0) / frameDurations.length;
-        const framesPerSecond = 1000 / avgFrameTime;
+        const fps = 1000 / avgFrameTime;
         const progress = Math.round(((currentFrame + 1) / totalFrames) * 100);
         const remainingFrames = totalFrames - (currentFrame + 1);
-        const remainingMs = remainingFrames * avgFrameTime;
-        const remainingSeconds = Math.round(remainingMs / 1000);
-        const eta = isFinite(remainingSeconds) && remainingSeconds > 0 
-            ? `${Math.floor(remainingSeconds / 60)}m ${remainingSeconds % 60}s` 
-            : '...';
+        const etaSeconds = Math.round(remainingFrames * (avgFrameTime / 1000));
+        const eta = isFinite(etaSeconds) && etaSeconds > 0 ? `${Math.floor(etaSeconds / 60)}m ${etaSeconds % 60}s` : '...';
 
-        textElement.textContent = `Rendering: ${progress}% (${currentFrame + 1}/${totalFrames}) | ${framesPerSecond.toFixed(1)} FPS | ETA: ${eta}`;
+        textElement.textContent = `Rendering: ${progress}% (${currentFrame + 1}/${totalFrames}) | ${fps.toFixed(1)} FPS | ETA: ${eta}`;
 
-        // F. Check if done, or schedule the next frame
         currentFrame++;
         if (currentFrame < totalFrames) {
-          // Schedule the next frame processing. This gives the browser
-          // a chance to breathe and prevents resource exhaustion.
-          requestAnimationFrame(processSingleFrame);
+          // If the worker is getting backed up, wait a moment. This acts as a 'backpressure'
+          // system, preventing memory from exploding if encoding is slower than rendering.
+          const delay = framesInFlight > 5 ? 16 : 0;
+          setTimeout(processSingleFrame, delay);
         } else {
-          // All frames are sent, tell the main process to finalize.
-          textElement.textContent = 'Encoding video... This may take a few minutes.';
-          const finalizeResult = await window.electronAPI.exportVideoFinalize({ fps: TARGET_FPS, totalFrames });
-          
-          // Restore video state
-          videoElement.currentTime = wasTime;
-          if (!wasPaused) videoElement.play();
+          // All frames have been SENT to the worker. Now we wait for it to finish.
+          const waitForWorkers = setInterval(async () => {
+            if (framesInFlight === 0) {
+              clearInterval(waitForWorkers);
+              encoderWorker.terminate(); // Clean up the worker
+              
+              textElement.textContent = 'Encoding video... This may take a few minutes.';
+              const finalizeResult = await window.electronAPI.exportVideoFinalize({ fps: TARGET_FPS, totalFrames });
+              
+              videoElement.currentTime = wasTime;
+              if (!wasPaused) videoElement.play();
 
-          if (finalizeResult.success) {
-            resolve();
-          } else {
-            reject(new Error(finalizeResult.error || 'Encoding process failed.'));
-          }
+              if (finalizeResult.success) resolve();
+              else reject(new Error(finalizeResult.error || 'Encoding process failed.'));
+            }
+          }, 100);
         }
       } catch (err) {
-        // Restore video state on error
+        encoderWorker.terminate();
         videoElement.currentTime = wasTime;
         if (!wasPaused) videoElement.play();
         reject(err);
       }
     };
 
-    // Start the process
-    requestAnimationFrame(processSingleFrame);
+    setTimeout(processSingleFrame, 0); // Start the loop
   });
 }
