@@ -95,7 +95,8 @@ void main() {
   vec3 bloom = texture2D(uBloom, v_uv).rgb;
   vec3 outc = screen(base, bloom * uI);
   vec3 hal = bloom * (uHal * 2.0) * vec3(1.0, 0.22, 0.07);
-  gl_FragColor = vec4(outc + hal, 1.0);
+  // Previous fix: Ensure this shader doesn't output negative values
+  gl_FragColor = vec4(max(outc + hal, 0.0), 1.0);
 }
 `;
 
@@ -131,7 +132,8 @@ void main() {
   vec3 b = blur9(v_uv);
   vec3 hi = c - b;
   c += hi * uAmt * 2.0;
-  gl_FragColor = vec4(c, 1.0);
+  // *** DEFINITIVE FIX: Ensure the clarity calculation never results in a negative color ***
+  gl_FragColor = vec4(max(c, 0.0), 1.0);
 }
 `;
 

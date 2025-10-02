@@ -57,8 +57,86 @@ ipcMain.handle('export-frame', async (event, dataUrl, suggestedName) => {
   }
 });
 
-// REWRITTEN WITH A MORE ACCURATE AND COLOR-CORRECT FILTER GRAPH
-ipcMain.handle('export-video-start', async (event, { inputPath, width, height, fps, duration }) => {
+/**
+ * Translates UI slider values into a robust FFmpeg filter string.
+ * This version uses stable filters to prevent crashes.
+ * @param {object} params - The state object from the UI.
+ * @returns {string} A comma-separated FFmpeg filter graph string.
+ */
+function buildFilterGraph(params) {
+  const filters = [];
+
+  // --- 1. Exposure (from exposure-flash.js) ---
+  const exposure = params.ev || 0;
+  if (Math.abs(exposure) > 0.01) {
+    filters.push(`lutyuv=y='val*pow(2,${exposure})'`);
+  }
+
+  // --- 2. Tone (from tone.js) - ROBUST IMPLEMENTATION ---
+  // *** DEFINITIVE FIX: Using the stable 'eq' filter instead of buggy 'curves' or 'geq'. ***
+  // This simulates Lifted Blacks by raising gamma and S-Curve with contrast.
+  const lift = params.blackLift || 0;
+  const scurve = params.scurve || 0;
+  const contrast = 1 + (scurve * 0.3); // Map S-curve slider to contrast
+  const gamma = 1 + (lift * 0.3); // Map Lifted Blacks to gamma
+  filters.push(`eq=contrast=${contrast}:gamma=${gamma}`);
+
+  // --- 3. Flash (from exposure-flash.js) ---
+  if (params.flashStrength > 0.01) {
+    const { flashStrength, flashFalloff, flashCenterX, flashCenterY } = params;
+    const flashEq = `p(X,Y) * (1 + ${flashStrength} / (1 + pow(${flashFalloff} * hypot(X-(${(1.0 - flashCenterX)}*W), Y-(${flashCenterY}*H)) / W, 2)))`;
+    filters.push(`geq=r='${flashEq}':g='${flashEq}':b='${flashEq}'`);
+  }
+  
+  // --- 4. Color Cast (from split-cast.js) ---
+  const green = params.greenShadows * 0.08;
+  const magenta = params.magentaMids * 0.06;
+  if (green > 0.005 || magenta > 0.005) {
+      filters.push(`colorbalance=gs=${green}:rm=${magenta}:bm=${magenta}`);
+  }
+
+  // --- 5. Bloom & Halation (Approximation) ---
+  if (params.bloomIntensity > 0.01) {
+    const bloom = params.bloomIntensity * 0.4;
+    filters.push(`unsharp=5:5:-${bloom}`); // Negative unsharp creates a blur/glow
+  }
+  if (params.halation > 0.01) {
+    filters.push(`colorbalance=rh=${params.halation * 0.05}`);
+  }
+  
+  // --- 6. Optics (Vignette, Clarity, CA) ---
+  if (params.vignette > 0.01) {
+    const strength = 1.0 + params.vignette * 0.5 + (params.vignettePower - 1.0) * 0.2;
+    filters.push(`vignette=eval=strength(${strength})`);
+  }
+  if (params.clarity > 0.01) {
+    const strength = (params.clarity * 2.0).toFixed(2);
+    filters.push(`unsharp=5:5:${strength}:5:5:0.0`);
+  }
+  if (params.ca > 0.01) {
+    const shift = (params.ca * 1.0).toFixed(2);
+    filters.push(`chromashift=cbh=-${shift}:crh=${shift}`);
+  }
+
+  // --- 7. Motion Blur (from motion-blur.js) ---
+  if (params.shutterUI > 0.1) {
+    const framesToMix = 1 + Math.floor(params.shutterUI * 9);
+    if (framesToMix > 1) {
+      filters.push(`tmix=frames=${framesToMix}:weights=1`);
+    }
+  }
+
+  // --- 8. Grain ---
+  filters.push("noise=alls=15:allf=t:c0s=7:c1s=7");
+
+  // --- Finalization ---
+  filters.push("format=yuv420p");
+  filters.push("pad=ceil(iw/2)*2:ceil(ih/2)*2");
+  
+  return filters.join(',');
+}
+
+ipcMain.handle('export-video-start', async (event, { inputPath, width, height, fps, duration, params }) => {
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     defaultPath: 'output.mp4',
     filters: [{ name: 'MP4 Video', extensions: ['mp4'] }],
@@ -71,23 +149,8 @@ ipcMain.handle('export-video-start', async (event, { inputPath, width, height, f
   const outputPath = filePath;
   const totalFrames = Math.floor(duration * fps);
 
-  // This new filter graph is more robust and produces a look much closer
-  // to the WebGL renderer's disposable camera aesthetic.
-  const filterGraph = [
-    // 1. Apply a standard contrast S-curve first
-    "curves=preset=medium_contrast",
-    // 2. Use colorbalance for proper tinting of shadows/mids
-    // Adds green to shadows and a slight magenta cast to midtones
-    "colorbalance=gs=0.08:rm=0.05:bm=0.05",
-    // 3. Optics: Default vignette
-    "vignette",
-    // 4. Optics: Clarity via unsharp mask
-    "unsharp=5:5:0.6:5:5:0.0",
-    // 5. Grain: Much stronger noise to avoid the "smooth" look
-    "noise=alls=20:allf=t",
-    // 6. Ensure dimensions are even for H.264 compatibility
-    "pad=ceil(iw/2)*2:ceil(ih/2)*2"
-  ].join(',');
+  // Build the filter graph dynamically from UI params
+  const filterGraph = buildFilterGraph(params);
 
   const ffmpegArgs = [
     '-i', inputPath,
@@ -95,26 +158,25 @@ ipcMain.handle('export-video-start', async (event, { inputPath, width, height, f
     '-c:v', 'libx264',
     '-preset', 'fast', 
     '-crf', '20',
-    '-pix_fmt', 'yuv420p',
     '-movflags', '+faststart',
     '-y',
     outputPath,
   ];
   
-  console.log('[EXPORT] Starting FAST native export with NEW command:');
+  console.log('[EXPORT] Starting DYNAMIC native export with command:');
   console.log(`ffmpeg ${ffmpegArgs.join(' ')}`);
 
   return new Promise((resolve) => {
     const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
 
+    let stderrOutput = '';
     ffmpegProcess.stderr.on('data', (data) => {
       const output = data.toString();
+      stderrOutput += output;
       
-      // Parse progress from FFmpeg's stderr
       const frameMatch = output.match(/frame=\s*(\d+)/);
       if (frameMatch) {
         const currentFrame = parseInt(frameMatch[1], 10);
-        // Ensure totalFrames is not zero to avoid division by zero
         const progress = totalFrames > 0 ? Math.min(100, Math.round((currentFrame / totalFrames) * 100)) : 0;
         mainWindow.webContents.send('export-progress', { progress, frameIndex: currentFrame, totalFrames });
       }
@@ -126,8 +188,8 @@ ipcMain.handle('export-video-start', async (event, { inputPath, width, height, f
         mainWindow.webContents.send('export-complete', { success: true, outputPath });
         resolve({ success: true });
       } else {
-        const errorMsg = `FFmpeg exited with error code ${code}`;
-        console.error(`[EXPORT] ${errorMsg}`);
+        const errorMsg = `FFmpeg exited with error code ${code}. Check console for details.`;
+        console.error(`[EXPORT] ${errorMsg}\nFFMPEG Log:\n${stderrOutput}`);
         mainWindow.webContents.send('export-complete', { success: false, error: errorMsg });
         resolve({ success: false, error: errorMsg });
       }

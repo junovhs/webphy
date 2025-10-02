@@ -95,14 +95,18 @@ async function exportVideoPipeline(api) {
   const canvas = $('#gl');
   
   $('#overlay').classList.remove('hidden');
-  $('#overlayText').textContent = 'Starting export…';
+  $('#overlayText').textContent = 'Preparing export…';
+
+  // *** Get all current slider values and send them with the request ***
+  const exportParams = api.getAllState();
 
   const result = await window.electronAPI.exportVideoStart({
     inputPath: videoPath,
     width: canvas.width,
     height: canvas.height,
     fps: 30, // Or get this from video metadata if available
-    duration: video.duration
+    duration: video.duration,
+    params: exportParams // Send all UI parameters to the main process
   });
   
   if (!result.success && result.cancelled) {

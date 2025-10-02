@@ -42,6 +42,7 @@ body {
   justify-content: center;
   padding: 5px;
   position: relative;
+  overflow: hidden; /* Prevent 1:1 panning from showing scrollbars */
 }
 
 #gl {
@@ -49,7 +50,8 @@ body {
   max-width: 100%;
   max-height: 100%;
   border-radius: 4px;
-  image-rendering: pixelated;
+  /* CRITICAL FIX: This ensures the canvas never stretches and maintains its aspect ratio */
+  object-fit: contain; 
 }
 
 /* CONTROLS - Fixed height, no scroll */
