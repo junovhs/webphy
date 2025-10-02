@@ -21,10 +21,8 @@ function setupExportButton(api) {
     try {
       if (isVideo) {
         if (isElectron) {
-          // This now calls the correct pipeline function
           await exportVideoPipeline(api);
         } else {
-          // Web fallback remains the same
           await exportVideoWeb(api);
         }
       } else {
@@ -45,7 +43,7 @@ function setupExportButton(api) {
   const updateButtonText = () => {
     const isVideo = api.getState('isVideo');
     if (isElectron) {
-      btn.textContent = isVideo ? 'Export MP4' : 'Export WebP';
+      btn.textContent = isVideo ? 'Export MP4 (Native Res)' : 'Export WebP';
     } else {
       btn.textContent = isVideo ? 'Export Frames (TAR)' : 'Export WebP';
     }
@@ -55,7 +53,6 @@ function setupExportButton(api) {
   window.updateExportButton = updateButtonText;
 }
 
-// The renderer-side logic for listening to progress updates
 function setupPipelineExport(api) {
   window.electronAPI.onExportProgress(({ progress, frameIndex, totalFrames }) => {
     const overlay = $('#overlay');
@@ -81,7 +78,6 @@ function setupPipelineExport(api) {
   });
 }
 
-// This function now correctly calls the 'export-video-start' IPC handler
 async function exportVideoPipeline(api) {
   const videoPath = api.getState('sourceVideoPath');
   
@@ -91,18 +87,22 @@ async function exportVideoPipeline(api) {
   }
   
   const video = $('#vid');
-  const canvas = $('#gl');
   
   $('#overlay').classList.remove('hidden');
-  $('#overlayText').textContent = 'Preparing export…';
+  $('#overlayText').textContent = 'Preparing native resolution export…';
 
   const exportParams = api.getAllState();
 
-  // *** CORRECTED FUNCTION CALL ***
+  // *** CRITICAL FIX: Use the video's NATIVE dimensions, not the canvas's. ***
+  const nativeWidth = api.getState('mediaW');
+  const nativeHeight = api.getState('mediaH');
+
+  console.log(`[EXPORT] Starting native resolution export at ${nativeWidth}x${nativeHeight}`);
+
   const result = await window.electronAPI.exportVideoStart({
     inputPath: videoPath,
-    width: canvas.width,
-    height: canvas.height,
+    width: nativeWidth,      // <-- PASSING NATIVE WIDTH
+    height: nativeHeight,    // <-- PASSING NATIVE HEIGHT
     fps: 30,
     duration: video.duration,
     params: exportParams
