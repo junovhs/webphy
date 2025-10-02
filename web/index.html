@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Disposable Night</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="viewer">
+    <canvas id="gl"></canvas>
+  </div>
+
+  <div id="controls">
+    <nav class="tabs" id="tab-nav"></nav>
+    <div class="tab-content" id="tab-content"></div>
+  </div>
+
+  <video id="vid" playsinline muted style="display:none"></video>
+  <div id="overlay" class="overlay hidden"><div id="overlayText">Processing…</div></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/umd/ffmpeg.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
