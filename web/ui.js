@@ -39,7 +39,7 @@ function generateControls(api) {
           <button id="original" class="btn btn-secondary">Original</button>
           <button id="view-mode" class="btn btn-secondary">Fit</button>
           <button id="reset" class="btn btn-secondary btn-full">Reset All</button>
-          <button id="export-btn" class="btn btn-primary btn-full">Export PNG</button>
+          <button id="export-btn" class="btn btn-primary btn-full">Export</button>
         </div>
       `;
     } else {
@@ -152,7 +152,6 @@ function setupFlashPad(api) {
 function setupCanvasInteraction(api) {
   const canvas = $('#gl');
   const container = $('#viewer');
-  const state = api.getAllState();
   
   const updateFlashFromCanvas = (cx, cy) => {
     const r = canvas.getBoundingClientRect();
@@ -164,9 +163,9 @@ function setupCanvasInteraction(api) {
     const pad = $('#flashPad');
     const dot = $('#flashDot');
     if (pad && dot) {
-      const r = pad.getBoundingClientRect();
-      dot.style.left = ((1.0 - api.getState('flashCenterX')) * r.width) + 'px';
-      dot.style.top = ((1.0 - api.getState('flashCenterY')) * r.height) + 'px';
+      const r_pad = pad.getBoundingClientRect();
+      dot.style.left = ((1.0 - api.getState('flashCenterX')) * r_pad.width) + 'px';
+      dot.style.top = ((1.0 - api.getState('flashCenterY')) * r_pad.height) + 'px';
     }
   };
   

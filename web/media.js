@@ -19,6 +19,12 @@ function setupFileInput(api) {
       api.loadVideo(file);
       $('#play').disabled = false;
       $('#play').textContent = 'Pause';
+      
+      // CRITICAL: Store original file path for export
+      // In Electron, file.path gives us the real filesystem path
+      if (typeof window.electronAPI !== 'undefined' && file.path) {
+        api.setState('sourceVideoPath', file.path);
+      }
     } else {
       api.loadImage(file);
       $('#play').disabled = true;

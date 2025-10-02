@@ -85,6 +85,10 @@ export function createFramebuffer(gl, caps, w, h) {
 
 export function ensureFramebuffer(rt, gl, caps, w, h) {
   if (!rt || rt.w !== w || rt.h !== h) {
+    if (rt) {
+        gl.deleteFramebuffer(rt.fbo);
+        gl.deleteTexture(rt.tex);
+    }
     return createFramebuffer(gl, caps, w, h);
   }
   return rt;

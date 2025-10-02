@@ -75,6 +75,8 @@ export function createUIAPI(state, gl, canvas, video, render, layout, ensureRend
       img.src = URL.createObjectURL(file);
     },
     
+    getGL: () => gl,
+    
     loadVideo: (file) => {
       if (state._vfcb && video.cancelVideoFrameCallback) {
         try { video.cancelVideoFrameCallback(state._vfcb); } catch (e) {}
@@ -171,6 +173,7 @@ export function createUIAPI(state, gl, canvas, video, render, layout, ensureRend
           state.frameSeed = (state.frameSeed + 1) | 0;
           state.needsRender = true;
         }
+        render(performance.now());
         await new Promise(r => requestAnimationFrame(r));
         return await new Promise(r => canvas.toBlob(r, 'image/webp', 1.0));
       });
@@ -194,7 +197,6 @@ export function createUIAPI(state, gl, canvas, video, render, layout, ensureRend
           document.getElementById('overlay'), document.getElementById('overlayText'));
       });
       
-      // Return blob but trigger download immediately in export.js
       return blob;
     },
     
@@ -203,20 +205,17 @@ export function createUIAPI(state, gl, canvas, video, render, layout, ensureRend
     toast,
     layout,
     
-    // Render single frame (for Electron export)
     renderCurrentFrame: async () => {
       if (state.isVideo) {
         gl.bindTexture(gl.TEXTURE_2D, state.tex);
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
         state.frameSeed = (state.frameSeed + 1) | 0;
-        state.needsRender = true;
       }
       render(performance.now());
     }
   };
   
-  // Helper for full resolution export
   async function withFullRes(callback) {
     const prev = {
       cssW: canvas.style.width,

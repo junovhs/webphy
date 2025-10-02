@@ -1,28 +1,19 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // File operations
-  openFile: () => ipcRenderer.invoke('open-file'),
-  
-  // Single frame export
+  // Invokes a request to the main process
   exportFrame: (frameDataUrl, suggestedName) => 
     ipcRenderer.invoke('export-frame', frameDataUrl, suggestedName),
   
-  // Video export
-  exportVideoStart: (config) => 
+  exportVideoStart: (config) =>
     ipcRenderer.invoke('export-video-start', config),
   
-  exportVideoFrame: (data) => 
-    ipcRenderer.invoke('export-video-frame', data),
-  
-  exportVideoFinish: (data) => 
-    ipcRenderer.invoke('export-video-finish', data),
-  
-  exportVideoCancel: (data) => 
-    ipcRenderer.invoke('export-video-cancel', data),
-  
-  // Listen to progress updates
+  // Listens for events from the main process
   onExportProgress: (callback) => {
     ipcRenderer.on('export-progress', (event, data) => callback(data));
+  },
+  
+  onExportComplete: (callback) => {
+    ipcRenderer.on('export-complete', (event, data) => callback(data));
   }
 });
