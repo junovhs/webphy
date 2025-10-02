@@ -22,3 +22,9 @@ export function toast(message, kind = 'ok') {
   t.classList.remove('hidden');
   setTimeout(() => t.classList.add('hidden'), 2200);
 }
+
+export function waitForVideoSeeked(videoElement) {
+  return new Promise(resolve => {
+    videoElement.addEventListener('seeked', resolve, { once: true });
+  });
+}

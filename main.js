@@ -57,8 +57,8 @@ ipcMain.handle('export-frame', async (event, dataUrl, suggestedName) => {
   }
 });
 
-// REWRITTEN TO DYNAMICALLY BUILD FILTERS FROM UI PARAMETERS
-ipcMain.handle('export-video-start', async (event, { inputPath, fps, duration, params }) => {
+// REWRITTEN WITH A MORE ACCURATE AND COLOR-CORRECT FILTER GRAPH
+ipcMain.handle('export-video-start', async (event, { inputPath, width, height, fps, duration }) => {
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     defaultPath: 'output.mp4',
     filters: [{ name: 'MP4 Video', extensions: ['mp4'] }],
@@ -71,59 +71,23 @@ ipcMain.handle('export-video-start', async (event, { inputPath, fps, duration, p
   const outputPath = filePath;
   const totalFrames = Math.floor(duration * fps);
 
-  // --- Dynamic Filter Graph Construction ---
-  const filters = [];
-
-  // 1. Exposure
-  if (params.ev !== 0) {
-    // FFmpeg's 'eq' brightness is roughly equivalent to exposure
-    const brightness = (params.ev * 0.2).toFixed(3);
-    filters.push(`eq=brightness=${brightness}`);
-  }
-
-  // 2. Tone (S-Curve, Black Crush, Lifted Blacks)
-  if (params.scurve > 0.01) {
-    filters.push('curves=preset=medium_contrast');
-  }
-  if (params.blacks > 0.001 || params.blackLift > 0.001) {
-    const inputBlack = params.blacks.toFixed(3);
-    const outputBlack = params.blackLift.toFixed(3);
-    filters.push(`levels=black_in=${inputBlack}:black_out=${outputBlack}`);
-  }
-
-  // 3. Color (Green Shadows, Magenta Mids)
-  if (params.greenShadows > 0.01 || params.magentaMids > 0.01) {
-    const greenShadows = (params.greenShadows * 0.15).toFixed(3);
-    const magentaMidsR = (params.magentaMids * 0.08).toFixed(3);
-    const magentaMidsB = (params.magentaMids * 0.08).toFixed(3);
-    filters.push(`colorbalance=gs=${greenShadows}:rm=${magentaMidsR}:bm=${magentaMidsB}`);
-  }
-
-  // 4. Optics (Vignette, Clarity, Chromatic Aberration)
-  if (params.vignette > 0.001) {
-    // We can make vignette stronger by chaining it
-    const vigStrength = 1 + params.vignette * 1.5;
-    filters.push(`vignette=eval=frame:angle=PI/3*${vigStrength}`);
-  }
-  if (params.clarity > 0.01) {
-    const clarityAmount = (params.clarity * 2.0).toFixed(2);
-    filters.push(`unsharp=5:5:${clarityAmount}:5:5:0.0`);
-  }
-  if (params.ca > 0.01) {
-    const caAmount = Math.floor(params.ca * 1.5);
-    filters.push(`chromashift=${caAmount}:${caAmount}`);
-  }
-
-  // 5. Grain
-  if (params.grainAmount > 0.01) {
-    const grainStrength = Math.floor(params.grainAmount * 12);
-    filters.push(`noise=alls=${grainStrength}:allf=t+p`);
-  }
-
-  // 6. Final padding for compatibility
-  filters.push("pad=ceil(iw/2)*2:ceil(ih/2)*2");
-  
-  const filterGraph = filters.join(',');
+  // This new filter graph is more robust and produces a look much closer
+  // to the WebGL renderer's disposable camera aesthetic.
+  const filterGraph = [
+    // 1. Apply a standard contrast S-curve first
+    "curves=preset=medium_contrast",
+    // 2. Use colorbalance for proper tinting of shadows/mids
+    // Adds green to shadows and a slight magenta cast to midtones
+    "colorbalance=gs=0.08:rm=0.05:bm=0.05",
+    // 3. Optics: Default vignette
+    "vignette",
+    // 4. Optics: Clarity via unsharp mask
+    "unsharp=5:5:0.6:5:5:0.0",
+    // 5. Grain: Much stronger noise to avoid the "smooth" look
+    "noise=alls=20:allf=t",
+    // 6. Ensure dimensions are even for H.264 compatibility
+    "pad=ceil(iw/2)*2:ceil(ih/2)*2"
+  ].join(',');
 
   const ffmpegArgs = [
     '-i', inputPath,
@@ -137,7 +101,7 @@ ipcMain.handle('export-video-start', async (event, { inputPath, fps, duration, p
     outputPath,
   ];
   
-  console.log('[EXPORT] Starting FAST native export with DYNAMIC command:');
+  console.log('[EXPORT] Starting FAST native export with NEW command:');
   console.log(`ffmpeg ${ffmpegArgs.join(' ')}`);
 
   return new Promise((resolve) => {
@@ -145,9 +109,12 @@ ipcMain.handle('export-video-start', async (event, { inputPath, fps, duration, p
 
     ffmpegProcess.stderr.on('data', (data) => {
       const output = data.toString();
+      
+      // Parse progress from FFmpeg's stderr
       const frameMatch = output.match(/frame=\s*(\d+)/);
       if (frameMatch) {
         const currentFrame = parseInt(frameMatch[1], 10);
+        // Ensure totalFrames is not zero to avoid division by zero
         const progress = totalFrames > 0 ? Math.min(100, Math.round((currentFrame / totalFrames) * 100)) : 0;
         mainWindow.webContents.send('export-progress', { progress, frameIndex: currentFrame, totalFrames });
       }

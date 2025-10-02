@@ -23,6 +23,7 @@ function setupExportButton(api) {
         if (isElectron) {
           await exportVideoPipeline(api);
         } else {
+          // Web fallback remains unchanged
           await exportVideoWeb(api);
         }
       } else {
@@ -36,6 +37,7 @@ function setupExportButton(api) {
       if (err.message && err.message !== 'Export cancelled') {
         api.toast(err.message, 'err');
       }
+      // Hide overlay on any error
       $('#overlay').classList.add('hidden');
     }
   };
@@ -55,6 +57,7 @@ function setupExportButton(api) {
 
 // The renderer-side processing logic is now only for listening to progress/completion
 function setupPipelineExport(api) {
+  // Progress updates
   window.electronAPI.onExportProgress(({ progress, frameIndex, totalFrames }) => {
     const overlay = $('#overlay');
     const overlayText = $('#overlayText');
@@ -67,6 +70,7 @@ function setupPipelineExport(api) {
     }
   });
   
+  // Completion
   window.electronAPI.onExportComplete(({ success, outputPath, error }) => {
     const overlay = $('#overlay');
     overlay.classList.add('hidden');
@@ -88,30 +92,17 @@ async function exportVideoPipeline(api) {
   }
   
   const video = $('#vid');
+  const canvas = $('#gl');
   
-  // GATHER ALL RELEVANT PARAMETERS FROM THE UI STATE
-  const params = {
-    ev: api.getState('ev'),
-    scurve: api.getState('scurve'),
-    blacks: api.getState('blacks'),
-    blackLift: api.getState('blackLift'),
-    greenShadows: api.getState('greenShadows'),
-    magentaMids: api.getState('magentaMids'),
-    vignette: api.getState('vignette'),
-    vignettePower: api.getState('vignettePower'),
-    ca: api.getState('ca'),
-    clarity: api.getState('clarity'),
-    grainAmount: api.getState('grainAmount'),
-  };
-
   $('#overlay').classList.remove('hidden');
   $('#overlayText').textContent = 'Starting export…';
 
   const result = await window.electronAPI.exportVideoStart({
     inputPath: videoPath,
-    fps: 30,
-    duration: video.duration,
-    params: params // Pass the collected parameters to the main process
+    width: canvas.width,
+    height: canvas.height,
+    fps: 30, // Or get this from video metadata if available
+    duration: video.duration
   });
   
   if (!result.success && result.cancelled) {
