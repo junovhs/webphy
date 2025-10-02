@@ -1,25 +1,25 @@
+// webphy/preload.js
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  openFile: () => ipcRenderer.invoke('open-file'),
-  
   exportFrame: (frameDataUrl, suggestedName) => 
     ipcRenderer.invoke('export-frame', frameDataUrl, suggestedName),
   
-  exportVideoStart: (config) =>
-    ipcRenderer.invoke('export-video-start', config),
+  // --- API FOR FRAME-BY-FRAME VIDEO EXPORT ---
+
+  exportVideoInitialize: () => 
+    ipcRenderer.invoke('export-video-initialize'),
   
-  // Listen for frame processing requests
-  onProcessFrame: (callback) => {
-    ipcRenderer.on('process-frame', (event, data) => callback(data));
-  },
+  // Note: We send the frame data as a raw ArrayBuffer (Uint8Array)
+  exportVideoWriteFrame: (frameData) => 
+    ipcRenderer.send('export-video-write-frame', frameData),
   
-  // Send processed frame back
-  sendProcessedFrame: (data) => {
-    ipcRenderer.send('processed-frame-reply', data);
-  },
+  exportVideoFinalize: (config) => 
+    ipcRenderer.invoke('export-video-finalize', config),
   
-  // Progress/completion listeners
+  // --- LISTENERS for progress updates from the main process ---
+  
   onExportProgress: (callback) => {
     ipcRenderer.on('export-progress', (event, data) => callback(data));
   },

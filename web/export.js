@@ -1,4 +1,6 @@
-// Export UI controls - proper FFmpeg pipeline
+// webphy/web/export.js
+
+import { exportVideoFrameSequence } from './export-video.js';
 
 const $ = s => document.querySelector(s);
 const isElectron = typeof window.electronAPI !== 'undefined';
@@ -7,8 +9,7 @@ export function initExport(api) {
   setupExportButton(api);
   
   if (isElectron) {
-    console.log('[EXPORT] Electron mode - pipeline export available');
-    setupPipelineExport(api);
+    console.log('[EXPORT] Electron mode - high-quality pipeline export available');
   }
 }
 
@@ -23,7 +24,6 @@ function setupExportButton(api) {
         if (isElectron) {
           await exportVideoPipeline(api);
         } else {
-          // Web fallback remains unchanged
           await exportVideoWeb(api);
         }
       } else {
@@ -37,7 +37,6 @@ function setupExportButton(api) {
       if (err.message && err.message !== 'Export cancelled') {
         api.toast(err.message, 'err');
       }
-      // Hide overlay on any error
       $('#overlay').classList.add('hidden');
     }
   };
@@ -45,7 +44,7 @@ function setupExportButton(api) {
   const updateButtonText = () => {
     const isVideo = api.getState('isVideo');
     if (isElectron) {
-      btn.textContent = isVideo ? 'Export MP4' : 'Export WebP';
+      btn.textContent = isVideo ? 'Export MP4 (High Quality)' : 'Export WebP';
     } else {
       btn.textContent = isVideo ? 'Export Frames (TAR)' : 'Export WebP';
     }
@@ -55,66 +54,17 @@ function setupExportButton(api) {
   window.updateExportButton = updateButtonText;
 }
 
-// The renderer-side processing logic is now only for listening to progress/completion
-function setupPipelineExport(api) {
-  // Progress updates
-  window.electronAPI.onExportProgress(({ progress, frameIndex, totalFrames }) => {
-    const overlay = $('#overlay');
-    const overlayText = $('#overlayText');
-    overlay.classList.remove('hidden');
-    
-    if (totalFrames > 0) {
-      overlayText.textContent = `Encoding: ${progress}% (${frameIndex}/${totalFrames})`;
-    } else {
-      overlayText.textContent = `Encoding: Frame ${frameIndex}`;
-    }
-  });
-  
-  // Completion
-  window.electronAPI.onExportComplete(({ success, outputPath, error }) => {
-    const overlay = $('#overlay');
-    overlay.classList.add('hidden');
-    
-    if (success) {
-      api.toast('Video exported successfully');
-    } else if (error) {
-      api.toast(error, 'err');
-    }
-  });
-}
-
 async function exportVideoPipeline(api) {
-  const videoPath = api.getState('sourceVideoPath');
-  
-  if (!videoPath) {
-    api.toast('Original video file path not available', 'err');
-    return;
-  }
-  
   const video = $('#vid');
   const canvas = $('#gl');
-  
-  $('#overlay').classList.remove('hidden');
-  $('#overlayText').textContent = 'Preparing export…';
+  const overlay = $('#overlay');
+  const overlayText = $('#overlayText');
 
-  // *** Get all current slider values and send them with the request ***
-  const exportParams = api.getAllState();
-
-  const result = await window.electronAPI.exportVideoStart({
-    inputPath: videoPath,
-    width: canvas.width,
-    height: canvas.height,
-    fps: 30, // Or get this from video metadata if available
-    duration: video.duration,
-    params: exportParams // Send all UI parameters to the main process
-  });
-  
-  if (!result.success && result.cancelled) {
-    api.toast('Export cancelled');
-    $('#overlay').classList.add('hidden');
-  } else if (!result.success) {
-    api.toast(result.error || 'Export failed', 'err');
-    $('#overlay').classList.add('hidden');
+  try {
+    await exportVideoFrameSequence(api, canvas, video, overlay, overlayText);
+    api.toast('Video exported successfully!');
+  } finally {
+    overlay.classList.add('hidden');
   }
 }
 

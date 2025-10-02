@@ -1,12 +1,15 @@
-// main.js
+// webphy/main.js
 
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { spawn } = require('child_process');
 const ffmpegPath = require('ffmpeg-static');
 
 let mainWindow;
+let exportTempDir = null; 
+let exportOutputPath = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -20,6 +23,7 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'web/index.html'));
+  // mainWindow.webContents.openDevTools(); // Uncomment for debugging
 }
 
 app.whenReady().then(() => {
@@ -57,86 +61,8 @@ ipcMain.handle('export-frame', async (event, dataUrl, suggestedName) => {
   }
 });
 
-/**
- * Translates UI slider values into a robust FFmpeg filter string.
- * This version uses stable filters to prevent crashes.
- * @param {object} params - The state object from the UI.
- * @returns {string} A comma-separated FFmpeg filter graph string.
- */
-function buildFilterGraph(params) {
-  const filters = [];
-
-  // --- 1. Exposure (from exposure-flash.js) ---
-  const exposure = params.ev || 0;
-  if (Math.abs(exposure) > 0.01) {
-    filters.push(`lutyuv=y='val*pow(2,${exposure})'`);
-  }
-
-  // --- 2. Tone (from tone.js) - ROBUST IMPLEMENTATION ---
-  // *** DEFINITIVE FIX: Using the stable 'eq' filter instead of buggy 'curves' or 'geq'. ***
-  // This simulates Lifted Blacks by raising gamma and S-Curve with contrast.
-  const lift = params.blackLift || 0;
-  const scurve = params.scurve || 0;
-  const contrast = 1 + (scurve * 0.3); // Map S-curve slider to contrast
-  const gamma = 1 + (lift * 0.3); // Map Lifted Blacks to gamma
-  filters.push(`eq=contrast=${contrast}:gamma=${gamma}`);
-
-  // --- 3. Flash (from exposure-flash.js) ---
-  if (params.flashStrength > 0.01) {
-    const { flashStrength, flashFalloff, flashCenterX, flashCenterY } = params;
-    const flashEq = `p(X,Y) * (1 + ${flashStrength} / (1 + pow(${flashFalloff} * hypot(X-(${(1.0 - flashCenterX)}*W), Y-(${flashCenterY}*H)) / W, 2)))`;
-    filters.push(`geq=r='${flashEq}':g='${flashEq}':b='${flashEq}'`);
-  }
-  
-  // --- 4. Color Cast (from split-cast.js) ---
-  const green = params.greenShadows * 0.08;
-  const magenta = params.magentaMids * 0.06;
-  if (green > 0.005 || magenta > 0.005) {
-      filters.push(`colorbalance=gs=${green}:rm=${magenta}:bm=${magenta}`);
-  }
-
-  // --- 5. Bloom & Halation (Approximation) ---
-  if (params.bloomIntensity > 0.01) {
-    const bloom = params.bloomIntensity * 0.4;
-    filters.push(`unsharp=5:5:-${bloom}`); // Negative unsharp creates a blur/glow
-  }
-  if (params.halation > 0.01) {
-    filters.push(`colorbalance=rh=${params.halation * 0.05}`);
-  }
-  
-  // --- 6. Optics (Vignette, Clarity, CA) ---
-  if (params.vignette > 0.01) {
-    const strength = 1.0 + params.vignette * 0.5 + (params.vignettePower - 1.0) * 0.2;
-    filters.push(`vignette=eval=strength(${strength})`);
-  }
-  if (params.clarity > 0.01) {
-    const strength = (params.clarity * 2.0).toFixed(2);
-    filters.push(`unsharp=5:5:${strength}:5:5:0.0`);
-  }
-  if (params.ca > 0.01) {
-    const shift = (params.ca * 1.0).toFixed(2);
-    filters.push(`chromashift=cbh=-${shift}:crh=${shift}`);
-  }
-
-  // --- 7. Motion Blur (from motion-blur.js) ---
-  if (params.shutterUI > 0.1) {
-    const framesToMix = 1 + Math.floor(params.shutterUI * 9);
-    if (framesToMix > 1) {
-      filters.push(`tmix=frames=${framesToMix}:weights=1`);
-    }
-  }
-
-  // --- 8. Grain ---
-  filters.push("noise=alls=15:allf=t:c0s=7:c1s=7");
-
-  // --- Finalization ---
-  filters.push("format=yuv420p");
-  filters.push("pad=ceil(iw/2)*2:ceil(ih/2)*2");
-  
-  return filters.join(',');
-}
-
-ipcMain.handle('export-video-start', async (event, { inputPath, width, height, fps, duration, params }) => {
+// STAGE 1: Initialize the export
+ipcMain.handle('export-video-initialize', async () => {
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
     defaultPath: 'output.mp4',
     filters: [{ name: 'MP4 Video', extensions: ['mp4'] }],
@@ -146,25 +72,51 @@ ipcMain.handle('export-video-start', async (event, { inputPath, width, height, f
     return { success: false, cancelled: true };
   }
 
-  const outputPath = filePath;
-  const totalFrames = Math.floor(duration * fps);
+  try {
+    exportTempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'disposable-night-'));
+    exportOutputPath = filePath;
+    console.log(`[EXPORT] Temp directory for frames created at: ${exportTempDir}`);
+    return { success: true };
+  } catch (error) {
+    console.error('[EXPORT] Failed to create temp directory:', error);
+    return { success: false, error: 'Failed to create temporary directory.' };
+  }
+});
 
-  // Build the filter graph dynamically from UI params
-  const filterGraph = buildFilterGraph(params);
+// STAGE 2: Receive and write frames (now handles efficient Uint8Array)
+ipcMain.on('export-video-write-frame', (event, { frameIndex, frameBuffer }) => {
+  if (!exportTempDir) return;
+  
+  try {
+    // Convert the received ArrayBuffer into a Node.js Buffer and write to disk
+    const buffer = Buffer.from(frameBuffer);
+    const framePath = path.join(exportTempDir, `frame_${String(frameIndex).padStart(6, '0')}.png`);
+    fs.writeFileSync(framePath, buffer);
+  } catch (error) {
+    console.error(`[EXPORT] Failed to write frame ${frameIndex} to disk:`, error);
+  }
+});
+
+// STAGE 3: Finalize the export
+ipcMain.handle('export-video-finalize', async (event, { fps, totalFrames }) => {
+  if (!exportTempDir || !exportOutputPath) {
+    return { success: false, error: 'Export process was not correctly initialized.' };
+  }
 
   const ffmpegArgs = [
-    '-i', inputPath,
-    '-vf', filterGraph,
+    '-framerate', String(fps),
+    '-i', path.join(exportTempDir, 'frame_%06d.png'),
     '-c:v', 'libx264',
-    '-preset', 'fast', 
-    '-crf', '20',
+    '-pix_fmt', 'yuv420p',
+    '-preset', 'medium',
+    '-crf', '18',
     '-movflags', '+faststart',
     '-y',
-    outputPath,
+    exportOutputPath,
   ];
-  
-  console.log('[EXPORT] Starting DYNAMIC native export with command:');
-  console.log(`ffmpeg ${ffmpegArgs.join(' ')}`);
+
+  console.log('[EXPORT] Finalizing video by stitching frames with command:');
+  console.log(`${ffmpegPath} ${ffmpegArgs.join(' ')}`);
 
   return new Promise((resolve) => {
     const ffmpegProcess = spawn(ffmpegPath, ffmpegArgs);
@@ -183,21 +135,32 @@ ipcMain.handle('export-video-start', async (event, { inputPath, width, height, f
     });
 
     ffmpegProcess.on('close', (code) => {
+      try {
+        if (exportTempDir) {
+          fs.rmSync(exportTempDir, { recursive: true, force: true });
+          console.log(`[EXPORT] Successfully cleaned up temp directory: ${exportTempDir}`);
+        }
+      } catch (e) {
+        console.error('[EXPORT] CRITICAL: Failed to clean up temp directory:', e);
+      }
+      exportTempDir = null;
+      exportOutputPath = null;
+
       if (code === 0) {
-        console.log('[EXPORT] Native export completed successfully.');
-        mainWindow.webContents.send('export-complete', { success: true, outputPath });
+        console.log('[EXPORT] FFmpeg stitching process completed successfully.');
+        mainWindow.webContents.send('export-complete', { success: true, outputPath: exportOutputPath });
         resolve({ success: true });
       } else {
-        const errorMsg = `FFmpeg exited with error code ${code}. Check console for details.`;
-        console.error(`[EXPORT] ${errorMsg}\nFFMPEG Log:\n${stderrOutput}`);
+        const errorMsg = `FFmpeg exited with error code ${code}. The video was not created.`;
+        console.error(`[EXPORT] ${errorMsg}\n--- FFMPEG LOG ---\n${stderrOutput}\n--- END LOG ---`);
         mainWindow.webContents.send('export-complete', { success: false, error: errorMsg });
         resolve({ success: false, error: errorMsg });
       }
     });
 
     ffmpegProcess.on('error', (err) => {
-        console.error('[EXPORT] Failed to start FFmpeg process.', err);
-        mainWindow.webContents.send('export-complete', { success: false, error: 'Failed to start FFmpeg process.' });
+        console.error('[EXPORT] Failed to start FFmpeg stitching process.', err);
+        mainWindow.webContents.send('export-complete', { success: false, error: 'Failed to start FFmpeg.' });
         resolve({ success: false, error: err.message });
     });
   });

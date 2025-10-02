@@ -1,146 +1,110 @@
-// MP4 export using FFmpeg.wasm
+// webphy/web/export-video.js
 
-let ffmpegCache = null;
-
-export async function initFFmpeg() {
-  if (ffmpegCache) return ffmpegCache;
-  
-  if (!window.FFmpeg || !window.FFmpeg.createFFmpeg) {
-    throw new Error('FFmpeg script not loaded.');
+/**
+ * Renders every frame of a video through the WebGL canvas and sends it
+ * to the Electron main process for encoding. This new version uses a more
+ * stable, single-frame processing loop to prevent browser/GPU crashes and slowdowns.
+ */
+export async function exportVideoFrameSequence(api, canvas, videoElement, overlayElement, textElement) {
+  if (document.hidden) {
+    throw new Error('Export cancelled: Page is not visible.');
   }
-  
-  const { createFFmpeg } = window.FFmpeg;
-  const ffmpeg = createFFmpeg({
-    log: true,
-    corePath: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js'
-  });
-  
-  await ffmpeg.load();
-  ffmpegCache = { ffmpeg };
-  return ffmpegCache;
-}
 
-export async function exportMP4(canvas, videoElement, renderFunc, overlayElement, textElement) {
-  const { ffmpeg } = await initFFmpeg();
-  
+  // --- 1. Initialization Phase ---
   overlayElement.classList.remove('hidden');
-  textElement.textContent = 'Export: grabbing frames… 0%';
-  
-  let i = 0;
-  const dur = Math.max(0.01, videoElement.duration || 1);
-  const wasLoop = videoElement.loop;
+  textElement.textContent = 'Initializing Export...';
+
+  const TARGET_FPS = 30;
+  const totalFrames = Math.floor(videoElement.duration * TARGET_FPS);
+
+  const initResult = await window.electronAPI.exportVideoInitialize();
+  if (initResult.cancelled) throw new Error('Export cancelled');
+  if (!initResult.success) throw new Error(initResult.error || 'Failed to initialize export.');
+
+  // Save video state
   const wasPaused = videoElement.paused;
-  const prevRate = videoElement.playbackRate;
-  
-  videoElement.loop = false;
-  videoElement.playbackRate = 1.0;
+  const wasTime = videoElement.currentTime;
   videoElement.pause();
   videoElement.currentTime = 0;
-  
-  await new Promise(resolve => {
-    videoElement.addEventListener('seeked', resolve, { once: true });
-  });
-  
-  const pngOfCanvas = () => new Promise(r => canvas.toBlob(r, 'image/png'));
-  const raf2 = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  
-  const grabOne = async () => {
-    await renderFunc();
-    await raf2();
-    const blob = await pngOfCanvas();
-    const ab = await blob.arrayBuffer();
-    const name = `f_${String(i).padStart(6, '0')}.png`;
-    ffmpeg.FS('writeFile', name, new Uint8Array(ab));
-    i++;
-    textElement.textContent = `Export: grabbing frames… ${Math.round((videoElement.currentTime / dur) * 100)}%`;
-  };
-  
-  await new Promise(resolve => {
-    let vfcb;
-    
-    const cleanup = () => {
-      if (videoElement.cancelVideoFrameCallback && vfcb) {
-        try {
-          videoElement.cancelVideoFrameCallback(vfcb);
-        } catch (e) {}
+  await new Promise(resolve => videoElement.addEventListener('seeked', resolve, { once: true }));
+
+  // For stable ETA calculation
+  const frameDurations = [];
+  const ROLLING_AVERAGE_FRAMES = 20;
+
+  return new Promise((resolve, reject) => {
+    let currentFrame = 0;
+
+    // This function processes ONE frame and then schedules the next one.
+    // This is the key to stability.
+    const processSingleFrame = async () => {
+      try {
+        const frameStartTime = performance.now();
+
+        // A. Set video time and wait for it to seek
+        videoElement.currentTime = currentFrame / TARGET_FPS;
+        await new Promise(r => videoElement.addEventListener('seeked', r, { once: true }));
+
+        // B. Render the frame with all WebGL effects
+        await api.renderCurrentFrame();
+        await new Promise(r => requestAnimationFrame(r)); // Wait for paint
+
+        // C. Get frame data as an efficient, asynchronous Blob
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        const frameBuffer = await blob.arrayBuffer();
+        
+        // D. Send the raw binary data to the main process
+        window.electronAPI.exportVideoWriteFrame({ frameIndex: currentFrame, frameBuffer });
+
+        // E. Update progress with a stable rolling-average ETA
+        const frameTime = performance.now() - frameStartTime;
+        frameDurations.push(frameTime);
+        if (frameDurations.length > ROLLING_AVERAGE_FRAMES) {
+          frameDurations.shift(); // Keep the array size fixed
+        }
+        
+        const avgFrameTime = frameDurations.reduce((a, b) => a + b, 0) / frameDurations.length;
+        const framesPerSecond = 1000 / avgFrameTime;
+        const progress = Math.round(((currentFrame + 1) / totalFrames) * 100);
+        const remainingFrames = totalFrames - (currentFrame + 1);
+        const remainingMs = remainingFrames * avgFrameTime;
+        const remainingSeconds = Math.round(remainingMs / 1000);
+        const eta = isFinite(remainingSeconds) && remainingSeconds > 0 
+            ? `${Math.floor(remainingSeconds / 60)}m ${remainingSeconds % 60}s` 
+            : '...';
+
+        textElement.textContent = `Rendering: ${progress}% (${currentFrame + 1}/${totalFrames}) | ${framesPerSecond.toFixed(1)} FPS | ETA: ${eta}`;
+
+        // F. Check if done, or schedule the next frame
+        currentFrame++;
+        if (currentFrame < totalFrames) {
+          // Schedule the next frame processing. This gives the browser
+          // a chance to breathe and prevents resource exhaustion.
+          requestAnimationFrame(processSingleFrame);
+        } else {
+          // All frames are sent, tell the main process to finalize.
+          textElement.textContent = 'Encoding video... This may take a few minutes.';
+          const finalizeResult = await window.electronAPI.exportVideoFinalize({ fps: TARGET_FPS, totalFrames });
+          
+          // Restore video state
+          videoElement.currentTime = wasTime;
+          if (!wasPaused) videoElement.play();
+
+          if (finalizeResult.success) {
+            resolve();
+          } else {
+            reject(new Error(finalizeResult.error || 'Encoding process failed.'));
+          }
+        }
+      } catch (err) {
+        // Restore video state on error
+        videoElement.currentTime = wasTime;
+        if (!wasPaused) videoElement.play();
+        reject(err);
       }
     };
-    
-    const onFrame = async () => {
-      videoElement.pause();
-      await grabOne();
-      
-      if (videoElement.ended || videoElement.currentTime >= dur - 1e-4) {
-        cleanup();
-        resolve();
-        return;
-      }
-      
-      vfcb = videoElement.requestVideoFrameCallback(onFrame);
-      videoElement.play().catch(() => {});
-    };
-    
-    vfcb = videoElement.requestVideoFrameCallback(onFrame);
-    videoElement.addEventListener('ended', () => {
-      cleanup();
-      resolve();
-    }, { once: true });
-    
-    videoElement.play().catch(() => {});
+
+    // Start the process
+    requestAnimationFrame(processSingleFrame);
   });
-  
-  textElement.textContent = 'Export: encoding…';
-  
-  ffmpeg.setLogger(({ message }) => {
-    const m = /frame=\s*(\d+)/.exec(message);
-    if (m) textElement.textContent = `Export: encoding… frame ${+m[1]}`;
-  });
-  
-  let outName = 'export.mp4';
-  let outMime = 'video/mp4';
-  
-  try {
-    await ffmpeg.run(
-      '-framerate', '30', '-i', 'f_%06d.png',
-      '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',
-      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '12',
-      '-preset', 'veryslow', '-movflags', '+faststart', outName
-    );
-  } catch (e1) {
-    try {
-      await ffmpeg.run(
-        '-framerate', '30', '-i', 'f_%06d.png',
-        '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2',
-        '-c:v', 'mpeg4', '-q:v', '1', '-movflags', '+faststart', outName
-      );
-    } catch (e2) {
-      outName = 'export.webm';
-      outMime = 'video/webm';
-      await ffmpeg.run(
-        '-framerate', '30', '-i', 'f_%06d.png',
-        '-c:v', 'libvpx-vp9', '-pix_fmt', 'yuv420p', '-b:v', '0', '-crf', '18', outName
-      );
-    }
-  }
-  
-  const data = ffmpeg.FS('readFile', outName);
-  const blob = new Blob([data.buffer], { type: outMime });
-  
-  // Cleanup
-  for (let k = 0; k < i; k++) {
-    try {
-      ffmpeg.FS('unlink', `f_${String(k).padStart(6, '0')}.png`);
-    } catch (e) {}
-  }
-  try {
-    ffmpeg.FS('unlink', outName);
-  } catch (e) {}
-  
-  overlayElement.classList.add('hidden');
-  
-  videoElement.loop = wasLoop;
-  videoElement.playbackRate = prevRate;
-  if (wasPaused) videoElement.pause();
-  
-  return { blob, filename: outName };
 }
