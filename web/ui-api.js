@@ -32,8 +32,7 @@ export const TAB_CONFIG = [
   { id: 'optics', label: 'Optics', params: ['halation', 'vignette', 'vignettePower', 'ca', 'clarity'] },
   { id: 'motion', label: 'Motion', params: ['shutterUI', 'shake', 'motionAngle'] },
   { id: 'handheld', label: 'Handheld', params: ['shakeHandheld', 'shakeStyle', 'shakeWobble', 'shakeJitter'] },
-  { id: 'grain', label: 'Grain', params: Object.keys(GRAIN_PARAMS) },
-  { id: 'file', label: 'File', special: 'file' }
+  { id: 'grain', label: 'Grain', params: Object.keys(GRAIN_PARAMS) }
 ];
 
 // Create the API that UI components consume

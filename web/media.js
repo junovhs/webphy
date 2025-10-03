@@ -17,27 +17,108 @@ function setupFileInput(api) {
     
     if (isVideo) {
       api.loadVideo(file);
-      $('#play').disabled = false;
-      $('#play').textContent = 'Pause';
       
-      // CRITICAL: Store original file path for export
-      // In Electron, file.path gives us the real filesystem path
+      const transportBar = $('#transport-bar');
+      if (transportBar) transportBar.classList.remove('hidden');
+      
       if (typeof window.electronAPI !== 'undefined' && file.path) {
         api.setState('sourceVideoPath', file.path);
       }
     } else {
       api.loadImage(file);
-      $('#play').disabled = true;
+      
+      const transportBar = $('#transport-bar');
+      if (transportBar) transportBar.classList.add('hidden');
     }
     
-    // Update export button text
     if (window.updateExportButton) {
       window.updateExportButton();
     }
   });
 }
 
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function setupTransportControls(api) {
+  const video = $('#vid');
+  const transportPlay = $('#transport-play');
+  const timeline = $('#timeline');
+  const currentTime = $('#current-time');
+  const durationTime = $('#duration-time');
+  const playIcon = $('#play-icon');
+  const pauseIcon = $('#pause-icon');
+  
+  // Update play/pause icon
+  function updatePlayIcon(playing) {
+    if (playIcon && pauseIcon) {
+      if (playing) {
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+      } else {
+        playIcon.style.display = 'block';
+        pauseIcon.style.display = 'none';
+      }
+    }
+  }
+  
+  // Transport play/pause
+  if (transportPlay) {
+    transportPlay.onclick = () => {
+      if (!api.getState('isVideo')) return;
+      
+      if (video.paused) {
+        video.play();
+        updatePlayIcon(true);
+      } else {
+        video.pause();
+        updatePlayIcon(false);
+      }
+    };
+  }
+  
+  // Timeline scrubbing with REAL-TIME preview
+  if (timeline) {
+    let seeking = false;
+    
+    timeline.addEventListener('mousedown', () => {
+      seeking = true;
+      video.pause();
+    });
+    
+    timeline.addEventListener('input', (e) => {
+      if (!api.getState('isVideo')) return;
+      const time = (parseFloat(e.target.value) / 100) * video.duration;
+      video.currentTime = time;
+      if (currentTime) currentTime.textContent = formatTime(time);
+    });
+    
+    timeline.addEventListener('mouseup', () => {
+      seeking = false;
+    });
+    
+    // Update timeline as video plays
+    video.addEventListener('timeupdate', () => {
+      if (seeking) return;
+      const percent = (video.currentTime / video.duration) * 100;
+      timeline.value = percent || 0;
+      if (currentTime) currentTime.textContent = formatTime(video.currentTime);
+    });
+    
+    video.addEventListener('loadedmetadata', () => {
+      if (durationTime) durationTime.textContent = formatTime(video.duration);
+      timeline.max = 100;
+      timeline.value = 0;
+    });
+    
+    video.addEventListener('play', () => updatePlayIcon(true));
+    video.addEventListener('pause', () => updatePlayIcon(false));
+  }
+  
+  // Legacy controls
   const playBtn = $('#play');
   const originalBtn = $('#original');
   const viewBtn = $('#view-mode');
@@ -46,6 +127,7 @@ function setupTransportControls(api) {
     playBtn.onclick = () => {
       const playing = api.togglePlayback();
       playBtn.textContent = playing ? 'Pause' : 'Play';
+      updatePlayIcon(playing);
     };
   }
   
@@ -68,7 +150,6 @@ function setupResetButton(api) {
   $('#reset').onclick = () => {
     api.resetAll();
     
-    // Update all UI controls
     Object.entries(api.params).forEach(([key, config]) => {
       const el = $(`#${key}`);
       if (!el) return;
@@ -82,7 +163,6 @@ function setupResetButton(api) {
       }
     });
     
-    // Update flash dot
     const pad = $('#flashPad');
     const dot = $('#flashDot');
     if (pad && dot) {

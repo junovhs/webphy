@@ -28,21 +28,7 @@ function generateControls(api) {
     pane.className = 'tab-pane';
     pane.dataset.pane = tab.id;
     
-    if (tab.special === 'file') {
-      pane.innerHTML = `
-        <div class="file-grid">
-          <label class="btn btn-primary btn-full">
-            <input id="file" type="file" accept="image/*,video/*" style="display:none" />
-            Open File
-          </label>
-          <button id="play" class="btn btn-secondary" disabled>Play</button>
-          <button id="original" class="btn btn-secondary">Original</button>
-          <button id="view-mode" class="btn btn-secondary">Fit</button>
-          <button id="reset" class="btn btn-secondary btn-full">Reset All</button>
-          <button id="export-btn" class="btn btn-primary btn-full">Export PNG</button>
-        </div>
-      `;
-    } else {
+    {
       if (tab.hasFlashPad) {
         pane.appendChild(createFlashPadControl());
       }
