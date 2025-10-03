@@ -7,8 +7,8 @@ export function initUI(api) {
   generateControls(api);
   setupTabs();
   bindControls(api);
-  setupFlashPad(api);
   setupCanvasInteraction(api);
+  // setupFlashPad is no longer needed
 }
 
 function generateControls(api) {
@@ -30,6 +30,7 @@ function generateControls(api) {
     
     {
       if (tab.hasFlashPad) {
+        // Generate the new instruction element instead of the pad
         pane.appendChild(createFlashPadControl());
       }
       
@@ -46,16 +47,21 @@ function generateControls(api) {
   tabContent.querySelector('.tab-pane').classList.add('active');
 }
 
+// MODIFIED FUNCTION
 function createFlashPadControl() {
   const el = document.createElement('div');
   el.className = 'control';
   el.innerHTML = `
     <div class="control-header">
       <span class="control-label">Flash Position</span>
-      <span class="control-value"></span>
     </div>
-    <div class="flash-pad" id="flashPad">
-      <div class="flash-dot" id="flashDot"></div>
+    <div class="flash-instruction" id="flashInstruction">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"/>
+            <path d="M12 5v14"/>
+            <circle cx="12" cy="12" r="10"/>
+        </svg>
+        <span>Click or drag on the image to position the flash.</span>
     </div>
   `;
   return el;
@@ -112,50 +118,18 @@ function bindControls(api) {
   });
 }
 
-function setupFlashPad(api) {
-  const pad = $('#flashPad');
-  const dot = $('#flashDot');
-  if (!pad || !dot) return;
-  
-  const updateDot = () => {
-    const r = pad.getBoundingClientRect();
-    dot.style.left = ((1.0 - api.getState('flashCenterX')) * r.width) + 'px';
-    dot.style.top = ((1.0 - api.getState('flashCenterY')) * r.height) + 'px';
-  };
-  
-  const setFromPointer = e => {
-    if (pad.classList.contains('disabled')) return;
-    const r = pad.getBoundingClientRect();
-    const cx = e.clientX ?? e.touches?.[0]?.clientX;
-    const cy = e.clientY ?? e.touches?.[0]?.clientY;
-    const fx = (cx - r.left) / r.width;
-    const fy = (cy - r.top) / r.height;
-    api.setState('flashCenterX', 1.0 - Math.max(0, Math.min(1, fx)));
-    api.setState('flashCenterY', 1.0 - Math.max(0, Math.min(1, fy)));
-    updateDot();
-  };
-  
-  createPointerTracker(pad, setFromPointer, true);
-  updateDot();
-}
+// REMOVED setupFlashPad() function
 
 function setupCanvasInteraction(api) {
   const canvas = $('#gl');
   
   const updateFlashFromCanvas = (cx, cy) => {
+    // This logic now implicitly updates the state. No need to update a dot.
     const r = canvas.getBoundingClientRect();
     const fx = (cx - r.left) / r.width;
     const fy = (cy - r.top) / r.height;
     api.setState('flashCenterX', 1.0 - Math.max(0, Math.min(1, fx)));
     api.setState('flashCenterY', 1.0 - Math.max(0, Math.min(1, fy)));
-    
-    const pad = $('#flashPad');
-    const dot = $('#flashDot');
-    if (pad && dot) {
-      const r_pad = pad.getBoundingClientRect();
-      dot.style.left = ((1.0 - api.getState('flashCenterX')) * r_pad.width) + 'px';
-      dot.style.top = ((1.0 - api.getState('flashCenterY')) * r_pad.height) + 'px';
-    }
   };
   
   let panStart = { x: 0, y: 0, ox: 0, oy: 0 };
@@ -166,8 +140,10 @@ function setupCanvasInteraction(api) {
         canvas.classList.add('dragging');
         panStart = { x: cx, y: cy, ox: api.getState('panX') || 0, oy: api.getState('panY') || 0 };
       } else {
-        api.setState('panX', panStart.ox + (cx - panStart.x));
-        api.setState('panY', panStart.oy + (cy - panStart.y));
+        const dx = cx - panStart.x;
+        const dy = cy - panStart.y;
+        api.setState('panX', panStart.ox + dx);
+        api.setState('panY', panStart.oy + dy);
         api.layout();
       }
     } else {

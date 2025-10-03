@@ -24,37 +24,39 @@
     <div class="toolbar-section">
       <button id="original" class="toolbar-toggle-btn" title="Toggle Original (A|B)">A | B</button>
       <div class="separator"></div>
-      <button id="view-mode" class="toolbar-btn">Fit</button>
+      <button id="view-mode" class="toolbar-btn">1:1</button>
       <div class="separator"></div>
       <button id="reset" class="toolbar-btn">Reset</button>
     </div>
     <div class="toolbar-section">
-      <button id="export-btn" class="toolbar-btn toolbar-btn-primary">Export</button>
+      <!-- MODIFIED BUTTON TEXT -->
+      <button id="export-btn" class="toolbar-btn toolbar-btn-primary">Export Image</button>
     </div>
   </div>
 
   <div id="viewer">
-    <!-- NEW WRAPPER for Canvas + Transport Bar -->
     <div id="player-wrapper">
       <canvas id="gl"></canvas>
       <div id="transport-bar" class="hidden">
-        <span id="current-time" class="time-stat">0:00</span>
-        <div class="transport-controls">
-          <button id="prev-frame" class="transport-btn small" aria-label="Previous Frame">
-             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 3v10L10 8z M11 3v10h2V3h-2z" transform="scale(-1, 1) translate(-16, 0)"/></svg>
-          </button>
-          <button id="transport-play" class="transport-btn" aria-label="Play/Pause">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M4 3v10l9-5z" id="play-icon"/>
-              <g id="pause-icon" style="display:none"><rect x="4" y="3" width="3" height="10"/><rect x="9" y="3" width="3" height="10"/></g>
-            </svg>
-          </button>
-          <button id="next-frame" class="transport-btn small" aria-label="Next Frame">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 3v10L10 8z M11 3v10h2V3h-2z"/></svg>
-          </button>
-        </div>
         <input type="range" id="timeline" min="0" max="100" value="0" step="0.1" />
-        <span id="duration-time" class="time-stat">0:00</span>
+        <div class="transport-controls-row">
+            <span id="current-time" class="time-stat">0:00</span>
+            <div class="transport-controls">
+                <button id="prev-frame" class="transport-btn small" aria-label="Previous Frame">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 3v10L10 8z M11 3v10h2V3h-2z" transform="scale(-1, 1) translate(-16, 0)"/></svg>
+                </button>
+                <button id="transport-play" class="transport-btn" aria-label="Play/Pause">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                    <path d="M4 3v10l9-5z" id="play-icon"/>
+                    <g id="pause-icon" style="display:none"><rect x="4" y="3" width="3" height="10"/><rect x="9" y="3" width="3" height="10"/></g>
+                    </svg>
+                </button>
+                <button id="next-frame" class="transport-btn small" aria-label="Next Frame">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 3v10L10 8z M11 3v10h2V3h-2z"/></svg>
+                </button>
+            </div>
+            <span id="duration-time" class="time-stat">0:00</span>
+        </div>
       </div>
     </div>
   </div>

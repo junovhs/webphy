@@ -40,17 +40,7 @@ function setupExportButton(api) {
     }
   };
   
-  const updateButtonText = () => {
-    const isVideo = api.getState('isVideo');
-    if (isElectron) {
-      btn.textContent = isVideo ? 'Export MP4 (Native Res)' : 'Export WebP';
-    } else {
-      btn.textContent = isVideo ? 'Export Frames (TAR)' : 'Export WebP';
-    }
-  };
-  
-  updateButtonText();
-  window.updateExportButton = updateButtonText;
+  // The updateButtonText function and window assignment have been removed from here.
 }
 
 function setupPipelineExport(api) {
@@ -92,8 +82,7 @@ async function exportVideoPipeline(api) {
   $('#overlayText').textContent = 'Preparing native resolution export…';
 
   const exportParams = api.getAllState();
-
-  // *** CRITICAL FIX: Use the video's NATIVE dimensions, not the canvas's. ***
+  
   const nativeWidth = api.getState('mediaW');
   const nativeHeight = api.getState('mediaH');
 
@@ -101,8 +90,8 @@ async function exportVideoPipeline(api) {
 
   const result = await window.electronAPI.exportVideoStart({
     inputPath: videoPath,
-    width: nativeWidth,      // <-- PASSING NATIVE WIDTH
-    height: nativeHeight,    // <-- PASSING NATIVE HEIGHT
+    width: nativeWidth,
+    height: nativeHeight,
     fps: 30,
     duration: video.duration,
     params: exportParams
@@ -117,7 +106,7 @@ async function exportVideoPipeline(api) {
   }
 }
 
-// --- Fallback functions are unchanged ---
+// --- Fallback functions ---
 
 async function exportVideoWeb(api) {
   const tarBlob = await api.exportPNGSequence();

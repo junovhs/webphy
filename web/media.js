@@ -14,20 +14,22 @@ function setupFileInput(api) {
     const file = e.target.files[0];
     if (!file) return;
     
+    // *** THIS IS THE DEFINITIVE FIX ***
+    const exportBtn = $('#export-btn');
     const isVideo = (file.type || '').startsWith('video/');
     
     if (isVideo) {
       api.loadVideo(file);
       $('#transport-bar').classList.remove('hidden');
+      if (exportBtn) exportBtn.textContent = 'Export MP4'; // Directly set the text here
       if (typeof window.electronAPI !== 'undefined' && file.path) {
         api.setState('sourceVideoPath', file.path);
       }
     } else {
       api.loadImage(file);
       $('#transport-bar').classList.add('hidden');
+      if (exportBtn) exportBtn.textContent = 'Export Image'; // And here for images
     }
-    
-    if (window.updateExportButton) window.updateExportButton();
   });
 }
 
@@ -75,15 +77,21 @@ function setupTransportControls(api) {
       if (currentTime) currentTime.textContent = formatTime(video.currentTime);
     };
 
-    timeline.addEventListener('mousedown', () => { seeking = true; video.pause(); });
+    timeline.addEventListener('mousedown', () => { if(api.getState('isVideo')) { seeking = true; video.pause(); }});
     timeline.addEventListener('input', (e) => {
-      if (!api.getState('isVideo')) return;
+      if (!api.getState('isVideo') || !seeking) return;
       const percent = parseFloat(e.target.value);
       video.currentTime = (percent / 100) * video.duration;
-      updateTimelineProgress();
     });
-    window.addEventListener('mouseup', () => { seeking = false; });
+    window.addEventListener('mouseup', () => { if(seeking) { seeking = false; }});
     
+    video.addEventListener('seeked', () => {
+      if (seeking) {
+        api.renderCurrentFrame();
+        updateTimelineProgress();
+      }
+    });
+
     video.addEventListener('timeupdate', () => { if (!seeking) updateTimelineProgress(); });
     video.addEventListener('loadedmetadata', () => {
       if (durationTime) durationTime.textContent = formatTime(video.duration);
@@ -105,18 +113,18 @@ function setupTransportControls(api) {
 function setupResetButton(api) {
   $('#reset').onclick = () => {
     api.resetAll();
+    
     Object.entries(api.params).forEach(([key, config]) => {
       const el = $(`#${key}`);
       if (!el) return;
+      
       el.value = config.default;
       const lbl = $(`.control-value[data-for="${key}"]`);
-      if (lbl) lbl.textContent = config.special === 'shutter' ? api.formatShutterSpeed(config.default) : api.formatParamValue(config.default, config.step);
+      if (lbl) {
+        lbl.textContent = config.special === 'shutter' ? 
+          api.formatShutterSpeed(config.default) : 
+          api.formatParamValue(config.default, config.step);
+      }
     });
-    const pad = $('#flashPad'), dot = $('#flashDot');
-    if (pad && dot) {
-      const r = pad.getBoundingClientRect();
-      dot.style.left = (0.5 * r.width) + 'px';
-      dot.style.top = (0.5 * r.height) + 'px';
-    }
   };
 }

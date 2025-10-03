@@ -37,8 +37,9 @@ const state = {
   flashCenterX: 0.5,
   flashCenterY: 0.5,
   viewMode: 'fit',
-  panX: 0,
-  panY: 0,
+  panX: null,
+  panY: null,
+  zoomScale: 1.0, // To store the current scale in 1:1 mode
   needsRender: true,
   showOriginal: false
 };
@@ -90,60 +91,66 @@ function ensureRenderTargets() {
 }
 
 function layout() {
-  const wrapper = $('#player-wrapper');
-  if (!state.mediaW || !state.mediaH) {
-    wrapper.style.width = wrapper.style.height = '0px';
-    return;
-  }
-  
-  const transportBar = $('#transport-bar');
-  const container = $('#viewer');
-  
-  const cW = container.clientWidth;
-  const cH = container.clientHeight;
+    const wrapper = $('#player-wrapper');
+    const container = $('#viewer');
 
-  // Calculate available height for the video, accounting for the transport bar
-  const transportHeight = state.isVideo ? (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--transport-height')) || 56) : 0;
-  const availableH = cH - transportHeight;
+    if (!state.mediaW || !state.mediaH || !wrapper || !container) return;
 
-  const scale = Math.min(cW / state.mediaW, availableH / state.mediaH);
-  
-  const wrapperW = Math.round(state.mediaW * scale);
-  const wrapperH = Math.round(state.mediaH * scale) + transportHeight;
-  
-  wrapper.style.width = `${wrapperW}px`;
-  wrapper.style.height = `${wrapperH}px`;
-  wrapper.style.maxWidth = `${cW}px`;
-  wrapper.style.maxHeight = `${cH}px`;
-
-  const canvasW = Math.round(state.mediaW * scale * state.dpr);
-  const canvasH = Math.round(state.mediaH * scale * state.dpr);
-
-  if (state.viewMode === 'fit') {
-    canvas.style.transform = '';
-    if (canvas.width !== canvasW || canvas.height !== canvasH) {
-      canvas.width = canvasW;
-      canvas.height = canvasH;
-      ensureRenderTargets();
-    }
-    gl.viewport(0, 0, canvasW, canvasH);
-  } else { // 1:1 Mode - scales the wrapper, canvas is native res
-    if (canvas.width !== state.mediaW || canvas.height !== state.mediaH) {
-      canvas.width = state.mediaW;
-      canvas.height = state.mediaH;
-      ensureRenderTargets();
-    }
-    gl.viewport(0, 0, state.mediaW, state.mediaH);
-
-    const panScale = wrapperW / state.mediaW;
-    const panX = (state.panX || 0) * panScale;
-    const panY = (state.panY || 0) * panScale;
+    const computedStyle = getComputedStyle(container);
+    const cW = container.clientWidth - parseFloat(computedStyle.paddingLeft) - parseFloat(computedStyle.paddingRight);
+    const cH = container.clientHeight - parseFloat(computedStyle.paddingTop) - parseFloat(computedStyle.paddingBottom);
     
-    // Panning logic for 1:1 needs to be re-evaluated if needed, for now we center
-    canvas.style.transform = `scale(${panScale}) translate(${state.panX/panScale}px, ${state.panY/panScale}px)`;
-  }
-  
-  state.needsRender = true;
+    const transportHeight = state.isVideo ? (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--transport-height')) || 64) : 0;
+    const availableH = Math.max(0, cH); // Full container height for wrapper
+    
+    const scaleFit = Math.min(cW / state.mediaW, (availableH - transportHeight) / state.mediaH);
+    const fitW = Math.round(state.mediaW * scaleFit);
+    const fitH = Math.round(state.mediaH * scaleFit);
+
+    wrapper.style.width = `${fitW}px`;
+    wrapper.style.height = `${fitH + transportHeight}px`;
+    canvas.style.height = `${fitH}px`;
+
+    if (state.viewMode === 'fit') {
+        state.zoomScale = 1.0;
+        state.panX = state.panY = null;
+        canvas.style.transform = 'translate(0, 0) scale(1)';
+        
+        const targetW = Math.round(fitW * state.dpr);
+        const targetH = Math.round(fitH * state.dpr);
+        if (canvas.width !== targetW || canvas.height !== targetH) {
+            canvas.width = targetW;
+            canvas.height = targetH;
+            ensureRenderTargets();
+        }
+        gl.viewport(0, 0, targetW, targetH);
+    } else { // 1:1 Mode
+        state.zoomScale = state.mediaW / fitW;
+
+        const targetW = Math.round(state.mediaW * state.dpr);
+        const targetH = Math.round(state.mediaH * state.dpr);
+        if (canvas.width !== targetW || canvas.height !== targetH) {
+            canvas.width = targetW;
+            canvas.height = targetH;
+            ensureRenderTargets();
+        }
+        gl.viewport(0, 0, targetW, targetH);
+        
+        if (state.panX === null || state.panY === null) {
+            state.panX = 0;
+            state.panY = 0;
+        }
+
+        const maxPanX = (state.zoomScale - 1) * fitW / 2;
+        const maxPanY = (state.zoomScale - 1) * fitH / 2;
+
+        state.panX = Math.max(-maxPanX, Math.min(maxPanX, state.panX));
+        state.panY = Math.max(-maxPanY, Math.min(maxPanY, state.panY));
+
+        canvas.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoomScale})`;
+    }
+
+    state.needsRender = true;
 }
 
 
