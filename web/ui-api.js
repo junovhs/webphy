@@ -137,14 +137,18 @@ export function createUIAPI(state, gl, canvas, video, render, layout, ensureRend
     },
     
     toggleViewMode: () => {
+      const flashPad = document.getElementById('flashPad');
       if (state.viewMode === 'fit') {
         state.viewMode = '1x';
         canvas.classList.add('grabbable');
+        if(flashPad) flashPad.classList.add('disabled');
+        // Reset pan to center when switching to 1:1
         state.panX = undefined;
         state.panY = undefined;
       } else {
         state.viewMode = 'fit';
         canvas.classList.remove('grabbable');
+        if(flashPad) flashPad.classList.remove('disabled');
       }
       layout();
       return state.viewMode;
@@ -223,9 +227,15 @@ export function createUIAPI(state, gl, canvas, video, render, layout, ensureRend
       cssW: canvas.style.width,
       cssH: canvas.style.height,
       w: canvas.width,
-      h: canvas.height
+      h: canvas.height,
+      transform: canvas.style.transform,
+      pos: canvas.style.position,
+      left: canvas.style.left,
+      top: canvas.style.top,
     };
     
+    canvas.style.position = 'static';
+    canvas.style.transform = '';
     canvas.style.width = state.mediaW + 'px';
     canvas.style.height = state.mediaH + 'px';
     canvas.width = state.mediaW;
@@ -234,15 +244,24 @@ export function createUIAPI(state, gl, canvas, video, render, layout, ensureRend
     ensureRenderTargets();
     state.needsRender = true;
     
+    // a single render call to ensure the canvas is populated at full res
+    render(performance.now()); 
+    await new Promise(r => requestAnimationFrame(r)); // wait for it to commit
+
     const result = await callback();
     
+    canvas.style.position = prev.pos;
     canvas.style.width = prev.cssW;
     canvas.style.height = prev.cssH;
+    canvas.style.transform = prev.transform;
+    canvas.style.left = prev.left;
+    canvas.style.top = prev.top;
     canvas.width = prev.w;
     canvas.height = prev.h;
     gl.viewport(0, 0, prev.w, prev.h);
     ensureRenderTargets();
     state.needsRender = true;
+    layout(); // re-apply layout
     
     return result;
   }

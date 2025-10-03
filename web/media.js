@@ -1,6 +1,7 @@
 // Media UI controls - pure callback-based
 
 const $ = s => document.querySelector(s);
+const FRAME_RATE_TARGET = 30; // for frame scrubbing
 
 export function initMedia(api) {
   setupFileInput(api);
@@ -17,23 +18,16 @@ function setupFileInput(api) {
     
     if (isVideo) {
       api.loadVideo(file);
-      
-      const transportBar = $('#transport-bar');
-      if (transportBar) transportBar.classList.remove('hidden');
-      
+      $('#transport-bar').classList.remove('hidden');
       if (typeof window.electronAPI !== 'undefined' && file.path) {
         api.setState('sourceVideoPath', file.path);
       }
     } else {
       api.loadImage(file);
-      
-      const transportBar = $('#transport-bar');
-      if (transportBar) transportBar.classList.add('hidden');
+      $('#transport-bar').classList.add('hidden');
     }
     
-    if (window.updateExportButton) {
-      window.updateExportButton();
-    }
+    if (window.updateExportButton) window.updateExportButton();
   });
 }
 
@@ -46,125 +40,79 @@ function formatTime(seconds) {
 function setupTransportControls(api) {
   const video = $('#vid');
   const transportPlay = $('#transport-play');
+  const prevFrameBtn = $('#prev-frame');
+  const nextFrameBtn = $('#next-frame');
   const timeline = $('#timeline');
   const currentTime = $('#current-time');
   const durationTime = $('#duration-time');
   const playIcon = $('#play-icon');
   const pauseIcon = $('#pause-icon');
   
-  // Update play/pause icon
   function updatePlayIcon(playing) {
-    if (playIcon && pauseIcon) {
-      if (playing) {
-        playIcon.style.display = 'none';
-        pauseIcon.style.display = 'block';
-      } else {
-        playIcon.style.display = 'block';
-        pauseIcon.style.display = 'none';
-      }
-    }
+    if (!playIcon || !pauseIcon) return;
+    playIcon.style.display = playing ? 'none' : 'block';
+    pauseIcon.style.display = playing ? 'block' : 'none';
   }
   
-  // Transport play/pause
-  if (transportPlay) {
-    transportPlay.onclick = () => {
-      if (!api.getState('isVideo')) return;
-      
-      if (video.paused) {
-        video.play();
-        updatePlayIcon(true);
-      } else {
-        video.pause();
-        updatePlayIcon(false);
-      }
-    };
+  function scrubFrames(direction) {
+    if (!api.getState('isVideo')) return;
+    video.pause();
+    const frameDuration = 1 / FRAME_RATE_TARGET;
+    const newTime = video.currentTime + (frameDuration * direction);
+    video.currentTime = Math.max(0, Math.min(video.duration, newTime));
   }
+
+  if (transportPlay) transportPlay.onclick = () => { if (api.getState('isVideo')) video.paused ? video.play() : video.pause(); };
+  if (prevFrameBtn) prevFrameBtn.onclick = () => scrubFrames(-1);
+  if (nextFrameBtn) nextFrameBtn.onclick = () => scrubFrames(1);
   
-  // Timeline scrubbing with REAL-TIME preview
   if (timeline) {
     let seeking = false;
-    
-    timeline.addEventListener('mousedown', () => {
-      seeking = true;
-      video.pause();
-    });
-    
-    timeline.addEventListener('input', (e) => {
-      if (!api.getState('isVideo')) return;
-      const time = (parseFloat(e.target.value) / 100) * video.duration;
-      video.currentTime = time;
-      if (currentTime) currentTime.textContent = formatTime(time);
-    });
-    
-    timeline.addEventListener('mouseup', () => {
-      seeking = false;
-    });
-    
-    // Update timeline as video plays
-    video.addEventListener('timeupdate', () => {
-      if (seeking) return;
+    const updateTimelineProgress = () => {
       const percent = (video.currentTime / video.duration) * 100;
+      timeline.style.setProperty('--timeline-progress', `${percent}%`);
       timeline.value = percent || 0;
       if (currentTime) currentTime.textContent = formatTime(video.currentTime);
+    };
+
+    timeline.addEventListener('mousedown', () => { seeking = true; video.pause(); });
+    timeline.addEventListener('input', (e) => {
+      if (!api.getState('isVideo')) return;
+      const percent = parseFloat(e.target.value);
+      video.currentTime = (percent / 100) * video.duration;
+      updateTimelineProgress();
     });
+    window.addEventListener('mouseup', () => { seeking = false; });
     
+    video.addEventListener('timeupdate', () => { if (!seeking) updateTimelineProgress(); });
     video.addEventListener('loadedmetadata', () => {
       if (durationTime) durationTime.textContent = formatTime(video.duration);
       timeline.max = 100;
-      timeline.value = 0;
+      updateTimelineProgress();
     });
     
     video.addEventListener('play', () => updatePlayIcon(true));
     video.addEventListener('pause', () => updatePlayIcon(false));
   }
   
-  // Legacy controls
-  const playBtn = $('#play');
   const originalBtn = $('#original');
   const viewBtn = $('#view-mode');
   
-  if (playBtn) {
-    playBtn.onclick = () => {
-      const playing = api.togglePlayback();
-      playBtn.textContent = playing ? 'Pause' : 'Play';
-      updatePlayIcon(playing);
-    };
-  }
-  
-  if (originalBtn) {
-    originalBtn.onclick = () => {
-      const showing = api.toggleOriginal();
-      originalBtn.classList.toggle('active', showing);
-    };
-  }
-  
-  if (viewBtn) {
-    viewBtn.onclick = () => {
-      const mode = api.toggleViewMode();
-      viewBtn.textContent = mode === 'fit' ? 'Fit' : '1:1';
-    };
-  }
+  if (originalBtn) originalBtn.onclick = () => { originalBtn.classList.toggle('active', api.toggleOriginal()); };
+  if (viewBtn) viewBtn.onclick = () => { viewBtn.textContent = api.toggleViewMode() === 'fit' ? 'Fit' : '1:1'; };
 }
 
 function setupResetButton(api) {
   $('#reset').onclick = () => {
     api.resetAll();
-    
     Object.entries(api.params).forEach(([key, config]) => {
       const el = $(`#${key}`);
       if (!el) return;
-      
       el.value = config.default;
       const lbl = $(`.control-value[data-for="${key}"]`);
-      if (lbl) {
-        lbl.textContent = config.special === 'shutter' ? 
-          api.formatShutterSpeed(config.default) : 
-          api.formatParamValue(config.default, config.step);
-      }
+      if (lbl) lbl.textContent = config.special === 'shutter' ? api.formatShutterSpeed(config.default) : api.formatParamValue(config.default, config.step);
     });
-    
-    const pad = $('#flashPad');
-    const dot = $('#flashDot');
+    const pad = $('#flashPad'), dot = $('#flashDot');
     if (pad && dot) {
       const r = pad.getBoundingClientRect();
       dot.style.left = (0.5 * r.width) + 'px';

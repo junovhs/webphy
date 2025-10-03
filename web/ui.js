@@ -50,7 +50,10 @@ function createFlashPadControl() {
   const el = document.createElement('div');
   el.className = 'control';
   el.innerHTML = `
-    <div class="control-label">Flash Position</div>
+    <div class="control-header">
+      <span class="control-label">Flash Position</span>
+      <span class="control-value"></span>
+    </div>
     <div class="flash-pad" id="flashPad">
       <div class="flash-dot" id="flashDot"></div>
     </div>
@@ -121,6 +124,7 @@ function setupFlashPad(api) {
   };
   
   const setFromPointer = e => {
+    if (pad.classList.contains('disabled')) return;
     const r = pad.getBoundingClientRect();
     const cx = e.clientX ?? e.touches?.[0]?.clientX;
     const cy = e.clientY ?? e.touches?.[0]?.clientY;
@@ -137,7 +141,6 @@ function setupFlashPad(api) {
 
 function setupCanvasInteraction(api) {
   const canvas = $('#gl');
-  const container = $('#viewer');
   
   const updateFlashFromCanvas = (cx, cy) => {
     const r = canvas.getBoundingClientRect();
@@ -160,7 +163,7 @@ function setupCanvasInteraction(api) {
   createPointerTracker(canvas, (cx, cy, isStart) => {
     if (api.getState('viewMode') === '1x') {
       if (isStart) {
-        container.classList.add('dragging');
+        canvas.classList.add('dragging');
         panStart = { x: cx, y: cy, ox: api.getState('panX') || 0, oy: api.getState('panY') || 0 };
       } else {
         api.setState('panX', panStart.ox + (cx - panStart.x));
@@ -170,7 +173,7 @@ function setupCanvasInteraction(api) {
     } else {
       updateFlashFromCanvas(cx, cy);
     }
-  }, false, () => container.classList.remove('dragging'));
+  }, false, () => canvas.classList.remove('dragging'));
 }
 
 function createPointerTracker(element, onMove, preventDefault = false, onEnd = null) {

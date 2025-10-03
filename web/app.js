@@ -90,30 +90,62 @@ function ensureRenderTargets() {
 }
 
 function layout() {
-  if (!state.mediaW || !state.mediaH) { canvas.style.width = canvas.style.height = '0px'; return; }
-  const container = $('#viewer'), cW = container.clientWidth, cH = container.clientHeight;
-  if (state.viewMode === 'fit') {
-    canvas.style.position = 'static'; canvas.style.left = canvas.style.top = canvas.style.transform = '';
-    const scale = Math.min(cW / state.mediaW, cH / state.mediaH);
-    const cssW = Math.max(1, Math.round(state.mediaW * scale)), cssH = Math.max(1, Math.round(state.mediaH * scale));
-    canvas.style.width = cssW + 'px'; canvas.style.height = cssH + 'px';
-    const W = Math.round(cssW * state.dpr), H = Math.round(cssH * state.dpr);
-    if (canvas.width !== W || canvas.height !== H) {
-      canvas.width = W; canvas.height = H; gl.viewport(0, 0, W, H); ensureRenderTargets(); state.needsRender = true;
-    }
-  } else {
-    canvas.style.position = 'absolute';
-    const vW = Math.min(state.mediaW, cW), vH = Math.min(state.mediaH, cH);
-    if (canvas.width !== vW || canvas.height !== vH) {
-      canvas.width = vW; canvas.height = vH; gl.viewport(0, 0, vW, vH); ensureRenderTargets(); state.needsRender = true;
-    }
-    canvas.style.width = vW + 'px'; canvas.style.height = vH + 'px';
-    if (typeof state.panX !== 'number') { state.panX = Math.round((cW - state.mediaW) / 2); state.panY = Math.round((cH - state.mediaH) / 2); }
-    state.panX = Math.max(cW - state.mediaW, Math.min(0, state.panX)); state.panY = Math.max(cH - state.mediaH, Math.min(0, state.panY));
-    canvas.style.left = state.panX + 'px'; canvas.style.top = state.panY + 'px';
+  const wrapper = $('#player-wrapper');
+  if (!state.mediaW || !state.mediaH) {
+    wrapper.style.width = wrapper.style.height = '0px';
+    return;
   }
+  
+  const transportBar = $('#transport-bar');
+  const container = $('#viewer');
+  
+  const cW = container.clientWidth;
+  const cH = container.clientHeight;
+
+  // Calculate available height for the video, accounting for the transport bar
+  const transportHeight = state.isVideo ? (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--transport-height')) || 56) : 0;
+  const availableH = cH - transportHeight;
+
+  const scale = Math.min(cW / state.mediaW, availableH / state.mediaH);
+  
+  const wrapperW = Math.round(state.mediaW * scale);
+  const wrapperH = Math.round(state.mediaH * scale) + transportHeight;
+  
+  wrapper.style.width = `${wrapperW}px`;
+  wrapper.style.height = `${wrapperH}px`;
+  wrapper.style.maxWidth = `${cW}px`;
+  wrapper.style.maxHeight = `${cH}px`;
+
+  const canvasW = Math.round(state.mediaW * scale * state.dpr);
+  const canvasH = Math.round(state.mediaH * scale * state.dpr);
+
+  if (state.viewMode === 'fit') {
+    canvas.style.transform = '';
+    if (canvas.width !== canvasW || canvas.height !== canvasH) {
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      ensureRenderTargets();
+    }
+    gl.viewport(0, 0, canvasW, canvasH);
+  } else { // 1:1 Mode - scales the wrapper, canvas is native res
+    if (canvas.width !== state.mediaW || canvas.height !== state.mediaH) {
+      canvas.width = state.mediaW;
+      canvas.height = state.mediaH;
+      ensureRenderTargets();
+    }
+    gl.viewport(0, 0, state.mediaW, state.mediaH);
+
+    const panScale = wrapperW / state.mediaW;
+    const panX = (state.panX || 0) * panScale;
+    const panY = (state.panY || 0) * panScale;
+    
+    // Panning logic for 1:1 needs to be re-evaluated if needed, for now we center
+    canvas.style.transform = `scale(${panScale}) translate(${state.panX/panScale}px, ${state.panY/panScale}px)`;
+  }
+  
   state.needsRender = true;
 }
+
 
 window.addEventListener('resize', layout);
 
