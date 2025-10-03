@@ -1,14 +1,26 @@
 // Enhanced Film Grain Module
 // Based on AOMedia AV1 film grain synthesis research
+// Resolution-normalized with authentic intensity scaling
 
 import { compileShader, bindProgram } from '../gl-context.js';
 
 export const GRAIN_PARAMS = {
-  grainAmount: { min: 0, max: 2, step: 0.05, default: 2.0, label: 'Grain Amount' },
-  grainSize: { min: 0.3, max: 3, step: 0.1, default: 0.7, label: 'Grain Size' },
-  grainCharacter: { min: 0, max: 1, step: 0.01, default: 0.62, label: 'Character' },
-  grainSharpness: { min: 0, max: 1, step: 0.01, default: 1.0, label: 'Sharpness' },
+  filmSpeed: { min: 100, max: 3200, step: 50, default: 800, label: 'Film Speed (ISO)' },
+  grainCharacter: { min: 0, max: 1, step: 0.01, default: 0.62, label: 'Grain Character' },
   grainChroma: { min: 0, max: 1, step: 0.01, default: 0.72, label: 'Color Grain' }
+};
+
+// Reference resolution for grain consistency
+const REFERENCE_HEIGHT = 1080;
+
+// Film speed presets (ISO → grain strength curves)
+const INTENSITY_CURVES = {
+  // Format: [luma_value, grain_strength] pairs
+  100:  [[0, 0.02], [40, 0.015], [128, 0.008], [200, 0.005], [255, 0.003]],
+  400:  [[0, 0.05], [40, 0.040], [128, 0.025], [200, 0.015], [255, 0.010]],
+  800:  [[0, 0.12], [40, 0.100], [128, 0.060], [200, 0.040], [255, 0.030]],
+  1600: [[0, 0.20], [40, 0.160], [128, 0.100], [200, 0.070], [255, 0.055]],
+  3200: [[0, 0.32], [40, 0.260], [128, 0.160], [200, 0.120], [255, 0.095]]
 };
 
 const VERTEX_SHADER = `
@@ -25,7 +37,8 @@ precision highp float;
 varying vec2 v_uv;
 uniform sampler2D uTex;
 uniform vec2 uRes;
-uniform float uAmount, uSize, uCharacter, uSharpness, uChroma, uSeed;
+uniform float uCharacter, uChroma, uSeed, uResScale;
+uniform float uIntensityCurve[10]; // 5 points x 2 values (luma, strength)
 
 // Better color space
 vec3 toLinear(vec3 s) {
@@ -55,9 +68,11 @@ vec3 hash3(vec2 p) {
   return fract((p3.xxy + p3.yzz) * p3.zyx);
 }
 
-// Simplified AR process
+// Autoregressive grain (from AV1 paper)
 float arGrain(vec2 p, float seed, float character) {
   float n = hash1(p + seed) - 0.5;
+  
+  // AR coefficients depend on character (lag parameter)
   float a0 = mix(0.85, 0.6, character);
   float a1 = mix(0.08, 0.25, character);
   
@@ -67,7 +82,7 @@ float arGrain(vec2 p, float seed, float character) {
   return a0 * n + a1 * (g_left + g_up);
 }
 
-// Gradient noise
+// Gradient noise for variation
 float gradNoise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
@@ -86,7 +101,7 @@ float gradNoise(vec2 p) {
   return mix(mix(va, vb, u.x), mix(vc, vd, u.x), u.y);
 }
 
-// Worley
+// Worley for shadow clumping
 float worley(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
@@ -104,7 +119,7 @@ float worley(vec2 p) {
   return minDist;
 }
 
-// Multi-octave grain
+// Multi-octave grain synthesis
 float grainLayer(vec2 p, float seed, float character) {
   float sum = 0.0;
   float amp = 0.5;
@@ -127,16 +142,40 @@ float grainLayer(vec2 p, float seed, float character) {
   return sum;
 }
 
+// Piece-wise linear lookup (from AV1 paper Section 4)
+float lookupIntensity(float luma) {
+  // Binary search would be more efficient, but 5 points is fine for linear
+  for (int i = 0; i < 4; i++) {
+    float x0 = uIntensityCurve[i * 2];
+    float y0 = uIntensityCurve[i * 2 + 1];
+    float x1 = uIntensityCurve[(i + 1) * 2];
+    float y1 = uIntensityCurve[(i + 1) * 2 + 1];
+    
+    if (luma >= x0 && luma <= x1) {
+      float t = (luma - x0) / (x1 - x0);
+      return mix(y0, y1, t);
+    }
+  }
+  
+  // Fallback (shouldn't reach here)
+  return uIntensityCurve[9]; // last strength value
+}
+
 void main() {
   vec3 color = texture2D(uTex, v_uv).rgb;
   vec3 linear = toLinear(color);
   float luma = dot(linear, vec3(0.2126, 0.7152, 0.0722));
   
-  // Grain coordinate space
-  float grainPixelSize = mix(0.8, 4.0, uSize);
-  vec2 grainUV = (v_uv * uRes) / grainPixelSize;
+  // Resolution-normalized grain coordinate (CRITICAL for consistency)
+  // Base grain size scaled by resolution relative to 1080p reference
+  float baseGrainSize = 1.2 * uResScale;
+  vec2 grainUV = (v_uv * uRes) / baseGrainSize;
   
-  // Luminance response
+  // Lookup intensity scaling from piece-wise linear curve
+  float lumaScaled = luma * 255.0;
+  float intensityScale = lookupIntensity(lumaScaled);
+  
+  // Luminance-dependent response (preserve midtone contrast)
   float midtones = 1.0 - pow(abs(luma - 0.5) * 2.0, 1.5);
   midtones = mix(0.3, 1.0, midtones);
   
@@ -146,12 +185,12 @@ void main() {
   // Generate luma grain
   float lumaGrain = grainLayer(grainUV, uSeed, uCharacter);
   
-  // Shadow clumping
+  // Shadow clumping (characteristic of film grain and underexposed sensors)
   float clumps = worley(grainUV * 0.6 + hash2(vec2(uSeed)) * 10.0);
   clumps = (clumps * 2.0 - 1.0) * 0.7;
   lumaGrain = mix(lumaGrain, clumps, shadows * uCharacter * 0.6);
   
-  // Chromatic grain
+  // Chromatic grain (looser AR correlation as per paper)
   vec3 chromaGrain = vec3(
     grainLayer(grainUV * 0.85 + vec2(12.34, 56.78), uSeed * 1.1, uCharacter * 0.7),
     grainLayer(grainUV * 0.85 + vec2(91.01, 23.45), uSeed * 1.2, uCharacter * 0.7),
@@ -160,17 +199,13 @@ void main() {
   
   vec3 grain = mix(vec3(lumaGrain), chromaGrain, uChroma);
   
-  // Sharpness
-  float contrast = mix(0.5, 2.0, uSharpness);
-  grain = grain * contrast;
-  
-  // Intensity modulation - MUCH stronger base value
-  float intensity = uAmount * 0.08; // Increased from 0.025
+  // Apply intensity scaling from LUT
+  float intensity = intensityScale;
   intensity *= midtones;
   intensity *= (1.0 - highlights * 0.6);
   intensity *= (1.0 + shadows * 0.4);
   
-  // Apply as density modulation
+  // Density modulation (as per paper equation 2)
   vec3 grainedLinear = linear + (grain * intensity);
   grainedLinear = max(grainedLinear, 0.0);
   
@@ -185,6 +220,39 @@ void main() {
   gl_FragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
 }
 `;
+
+function interpolateCurve(iso) {
+  // Find surrounding ISO values
+  const isoValues = [100, 400, 800, 1600, 3200];
+  
+  if (iso <= 100) return INTENSITY_CURVES[100];
+  if (iso >= 3200) return INTENSITY_CURVES[3200];
+  
+  // Find bracketing values
+  let lower = 100, upper = 400;
+  for (let i = 0; i < isoValues.length - 1; i++) {
+    if (iso >= isoValues[i] && iso <= isoValues[i + 1]) {
+      lower = isoValues[i];
+      upper = isoValues[i + 1];
+      break;
+    }
+  }
+  
+  // Linear interpolation between curves
+  const t = (iso - lower) / (upper - lower);
+  const lowerCurve = INTENSITY_CURVES[lower];
+  const upperCurve = INTENSITY_CURVES[upper];
+  
+  const result = [];
+  for (let i = 0; i < lowerCurve.length; i++) {
+    result.push([
+      lowerCurve[i][0], // luma value (same for all ISOs)
+      lowerCurve[i][1] * (1 - t) + upperCurve[i][1] * t // interpolated strength
+    ]);
+  }
+  
+  return result;
+}
 
 export class FilmGrainModule {
   constructor(gl, quad) {
@@ -222,10 +290,16 @@ export class FilmGrainModule {
     
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uAmount'), params.grainAmount);
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uSize'), params.grainSize);
+    // Resolution normalization (key for consistency)
+    const resolutionScale = canvasH / REFERENCE_HEIGHT;
+    gl.uniform1f(gl.getUniformLocation(this.program, 'uResScale'), resolutionScale);
+    
+    // Get intensity curve for current film speed
+    const curve = interpolateCurve(params.filmSpeed);
+    const curveFlat = curve.flat(); // [luma0, strength0, luma1, strength1, ...]
+    gl.uniform1fv(gl.getUniformLocation(this.program, 'uIntensityCurve'), curveFlat);
+    
     gl.uniform1f(gl.getUniformLocation(this.program, 'uCharacter'), params.grainCharacter);
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uSharpness'), params.grainSharpness);
     gl.uniform1f(gl.getUniformLocation(this.program, 'uChroma'), params.grainChroma);
     gl.uniform1f(gl.getUniformLocation(this.program, 'uSeed'), frameSeed);
     
