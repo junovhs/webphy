@@ -8,6 +8,10 @@ if (!window.location.href.endsWith('export.html')) {
         exportVideoStart: (config) =>
             ipcRenderer.invoke('export-video-start', config),
 
+        // NEW: fast audio probe for a given input path
+        detectAudio: (inputPath) =>
+            ipcRenderer.invoke('probe-audio', inputPath),
+
         exportFrame: (frameDataUrl, suggestedName) => 
             ipcRenderer.invoke('export-frame', frameDataUrl, suggestedName),
         
