@@ -1,579 +1,391 @@
-# Disposable Night — Next-Gen Authenticity Roadmap (Technical Spec)
+# Disposable Night — Simulation Engine Roadmap (Technical Spec v2.0)
 
-**Audience:** core developers working on Disposable Night / webphy
-**Purpose:** a definitive, build-ready plan to evolve the app from “good film vibe” to *indistinguishably authentic* emulation across disposable 35 mm, Polaroid/instant, consumer camcorders (VHS/MiniDV/Hi8), and early-smartphone (circa 2010) footage.
-**Scope:** new modules, rewrites, parameters, shader/CPU algorithms, pipeline order, export/cadence, presets, testing, and delivery plan.
+**Audience:** Core Engineering
+**Status:** Phase 1 (Foundation) Complete. Phase 2 (Simulation) Starting.
+**Purpose:** A definitive, build-ready plan to evolve the app from "aesthetic filters" to a **physically-motivated light simulation engine**.
+**Scope:** New modules, rigorous color science refactoring, temporal state management, new pipeline order, export parity, and delivery plan.
 
 ---
 
 ## 0) Design Principles & Constraints
 
-* **Realism emerges from layers.** Prefer many subtle, physically-motivated artifacts over a few heavy artistic filters.
-* **Color discipline.** Do physically-based math in linear light; convert to/from sRGB only at boundaries. Be explicit per stage.
-* **Parallels across preview & export.** The headless Electron export must render bit-identical to on-screen “Native Output Preview” mode at the chosen native resolution/cadence.
-* **Non-destructive, modular pipeline.** Small, single-responsibility passes with explicit inputs/outputs.
-* **Determinism by seed.** Pseudorandom effects accept seeds for reproducibility; vary over time via seeded frame counters.
+*   **The Path of Light.** We do not apply "effects." We simulate the physical journey of photons: `Scene Linear Light` → `Plastic Lens` → `Chemical Emulsion` → `Development (Density)` → `Scanner/Sensor` → `Digital Codec`.
+*   **Strict Color Discipline.**
+    *   **Linear Space:** All physical light interactions (Exposure, Flash, Bloom, Lens Blur) must happen on linear RGB values.
+    *   **Log/Density Space:** Film response and grain application happen in Log space.
+    *   **Display Space:** Only convert to sRGB/Gamma 2.2 at the very last step (or for UI preview).
+*   **Temporal Continuity.** Effects must not jitter randomly per frame. They must drift organically using 1D noise or PID controllers (e.g., Auto-Exposure hunting, Gate Weave).
+*   **Parity.** The headless Electron export must render bit-identical to the on-screen "Native Output Preview."
+*   **Determinism.** All randomness is seeded. Frame 100 must look identical every time it is rendered.
 
 ---
 
-## 1) Current Baseline (for reference)
+## 1) Current Baseline (Reference)
 
-* **ExposureFlashModule** (linear EV & inverse-square flash)
-* **ToneModule** (S-curve + lift/crush/shoulder)
-* **SplitCastModule** (artistic split toning & color cast)
-* **BloomVignetteOptics** (bright pass → pyramid blur → add, plus vignette, clarity, chromatic aberration)
-* **MotionBlurModule** (24-tap with “wiggle”)
-* **HandheldCameraModule** (multi-octave noise transform)
-* **FilmGrainModule** (AV1-inspired mixed noise with intensity curve)
-
-We will **keep** Exposure/Flash, Handheld, Grain, and Bloom core; **rewrite** Tone into a filmic response; **add** new physically-based modules; and **split** Bloom to house new optics variants.
+*   **ExposureFlashModule** (Linear EV & Flash) — *Keep, but enforce linear input.*
+*   **ToneModule** (S-Curve) — **DEPRECATE.** Replace with `FilmicResponse`.
+*   **SplitCastModule** (Tint) — *Keep, move to Print/Display stage.*
+*   **BloomVignetteOptics** — **REFACTOR.** Split "Lens Blur" (Optics) from "Bloom" (Glow). Vignette goes to Optics.
+*   **MotionBlurModule** — *Keep.*
+*   **HandheldCameraModule** — **REFACTOR.** Move state logic to `TemporalController`.
+*   **FilmGrainModule** — *Keep*, but ensure it applies in Log/Density space for accurate shadow response.
 
 ---
 
-## 2) Target Pipeline (high-level order)
+## 2) Target Pipeline (The "Physics" Order)
 
+This pipeline respects the physical order of operations. Light hits the lens before it hits the film.
+
+```mermaid
+graph TD
+    A["Media Ingest"] --> B["Linearize (sRGB to Linear)"]
+    B --> C["Exposure & Flash (Scene Physics)"]
+    C --> D["Lens Optics (MTF Blur, Astigmatism, Vignette)"]
+    D --> E["Geometric Aberration (Chroma Shift)"]
+    E --> F["Gate Weave (Vertex Transform)"]
+    F --> G["Filmic Response (Linear to Log Density)"]
+    G --> H["Halation (Red Channel Scatter)"]
+    H --> I["Film Grain (Applied in Density Space)"]
+    I --> J["Scanner/Digital Artifacts (Interlace, Noise)"]
+    J --> K["Output Transform (Log to Display sRGB)"]
 ```
-[Media Ingest → Linearize if needed]
-ExposureFlash → (Optional) GateWeave transform → FilmicResponse
-→ LensOptics/MTF → Bloom/Halation (+ variants)
-→ (Optional) RollingShutter → MotionBlur
-→ (Optional) CCD Vertical Smear → Vignette/Clarity/CA
-→ (Optional) SparseDefects/LightLeaks
-→ FilmGrain (placement configurable)
-→ OutputFormat (Downsample + Cadence)
-→ (Optional) Interlacing/HeadSwitch → CodecArtifacts
-→ OSD/DateStamp → Display/Export
-```
 
-Notes:
-
-* **GateWeave** is distinct from **Handheld** (operator motion). GateWeave is tiny, slow, and always on for film/camcorder looks. Handheld remains a creative control.
-* **Grain placement** can be `pre_resize` (film scan look) or `post_codec` (digital feel).
+**Notes:**
+*   **Gate Weave** shifts the image plane *before* sampling, simulating the film strip moving relative to the aperture.
+*   **Lens Optics** (Blur) must happen *before* Grain. You can have a blurry image with sharp grain (authentic). You cannot have blurry grain (fake).
 
 ---
 
 ## 3) Priority Plan Overview
 
-| Priority | Module                                       | Type      | Goal                                                 |
-| -------- | -------------------------------------------- | --------- | ---------------------------------------------------- |
-| **P0**   | FilmicResponse (rewrite Tone)                | Core      | Film/stock-accurate curve & crossover                |
-| **P0**   | LensOptics/MTF                               | New       | Real lens softness, field falloff, subtle distortion |
-| **P0**   | TemporalInstability (Flicker/Weave/WB drift) | New (CPU) | Temporal authenticity cues                           |
-| **P0**   | OutputFormat (Downsample+Cadence)            | New       | Era-correct native size & frame cadence              |
-| **P0**   | CodecArtifacts                               | New       | Chroma bleed, block/ringing, mosquito                |
-| **P1**   | Interlacing + HeadSwitch                     | New       | Camcorder giveaway artifacts                         |
-| **P1**   | RollingShutter + SharpenHalo                 | New       | Early iPhone signature                               |
-| **P1**   | CCD Vertical Smear + Anamorphic Bloom        | Extend    | CCD highlight streaks; anamorphic flavor             |
-| **P1**   | SparseDefects + LightLeaks                   | New       | Film defects used sparingly                          |
-| **P1**   | OSD/DateStamp                                | New       | Disposable/point-and-shoot era stamp                 |
-| **P2**   | InstantFilm (chemical/paper/frame)           | New       | Polaroid development & paper texture                 |
-| **P2**   | AE/AWB Hunt (temporal controller)            | New (CPU) | Auto exposure/WB oscillation                         |
-| **P2**   | Negative → Print pipeline                    | New       | Orange mask & print LUT staging                      |
+| Priority | Module | Type | Goal |
+| :--- | :--- | :--- | :--- |
+| **P0** | **Color Space Refactor** | Core | Rename all shader inputs (`uTexLin`, `uTexLog`) to prevent math errors. |
+| **P0** | **FilmicResponse** (Repl. Tone) | Chemistry | H-Curve simulation with toe/shoulder and color crossover. |
+| **P0** | **LensOptics** | Optics | Radial MTF softness (center sharp, corners soft). |
+| **P0** | **TemporalController** | Core (CPU) | Managing state drift (Exposure hunting, Weave). |
+| **P0** | **CodecArtifacts** | Digital | YUV 4:1:1 subsampling and macroblocking. |
+| **P1** | **Halation (Physically Based)** | Chemistry | Red-channel specific scatter based on emulsion thickness. |
+| **P1** | **Gate Weave** | Mechanics | Sub-pixel vertex shifting. |
+| **P1** | **CCD Smear & Sensor Noise** | Digital | Vertical highlight streaks and additive shadow noise. |
+| **P2** | **InstantFilm Frame** | Polish | Border texture and chemical development spread. |
+| **P2** | **DateStamp** | Polish | 7-segment display overlay with bloom. |
 
 ---
 
 ## 4) Detailed Specifications
 
-### 4.1 FilmicResponseModule (rewrite of Tone)
+### 4.1 FilmicResponseModule (The "H-Curve")
+**Objective:** Replace the generic "S-Curve" with a parametric curve that simulates the density response of negative film.
 
-**Objective:** Replace artistic curve set with a parametric *H-curve* that matches film/stock response, including optional color crossover.
+*   **Inputs:** `uTexLin` (Linear RGB).
+*   **Uniforms:**
+    *   `uToe`: Controls the shadow compression region.
+    *   `uGamma`: The straight-line slope (contrast) in Log space.
+    *   `uShoulder`: The highlight rolloff (soft clip).
+    *   `uWhitePoint`: The linear value that maps to 1.0 density.
+    *   `uCrossover`: `vec3` offset applied to the shoulder start point per channel.
+*   **Algorithm:**
+    *   Convert Linear RGB to Log2.
+    *   Apply parametric curve:
+        *   If `x < Toe`: Exponential ramp.
+        *   If `Toe < x < Shoulder`: Linear slope `y = gamma * x + b`.
+        *   If `x > Shoulder`: Asymptotic decay toward max density.
+    *   *Crossover Logic:* `shoulder_limit_r = base_shoulder + uCrossover.r`. This causes highlights to shift color (e.g., creamy yellow or cyan sun) before blowing out.
+*   **Outputs:** `uTexLog` (Normalized Density 0.0-1.0).
+*   **Parameters:**
+    *   `toe`: [0.0 - 0.4]
+    *   `gamma`: [0.8 - 1.6]
+    *   `shoulder`: [0.6 - 1.0]
+    *   `crossover`: [±0.1]
 
-**Inputs**
+### 4.2 LensOpticsModule (MTF & Astigmatism)
+**Objective:** Simulate the poor resolving power of cheap plastic lenses ($5 disposable camera lenses).
 
-* `uTex` (RGB in **linear**)
-* Uniforms: `uToe`, `uMid`, `uShoulder`, `uContrastTrim`, `uCrossoverRGB` (vec3 small deltas), `uEnableCrossover` (bool)
-* Optional: `uLut1D` (256×1 or 1024×1 RGB) **or** computed curve function on GPU
+*   **Inputs:** `uTexLin`.
+*   **Uniforms:** `uCenterSharpness`, `uEdgeBlurRadius`, `uAstigmatism`.
+*   **Algorithm:**
+    1.  Compute normalized radial distance `d` from center `(0.5, 0.5)`.
+    2.  `blur_radius = mix(0.0, uEdgeBlurRadius, pow(d, 2.5))`.
+    3.  **Gaussian Pass:** Perform a 9-tap or 13-tap blur using `blur_radius`.
+    4.  **Astigmatism (Optional):** Instead of a circular kernel, stretch the kernel tangentially to the radius vector (creates "swirly" bokeh at edges).
+*   **Outputs:** `uTexLin` (Blurred).
+*   **Parameters:**
+    *   `edgeBlur`: [0.0 - 4.0] (Pixels)
+    *   `falloff`: [1.5 - 4.0] (Power)
 
-**Algorithm**
+### 4.3 TemporalController (CPU State Manager)
+**Objective:** Manage values that drift over time. Replaces random per-frame jitter.
 
-* CPU: generate 1D LUT(s) in linear light:
+*   **State:**
+    *   `time`: Accumulates `dt`.
+    *   `noiseGenerator`: 1D Simplex/Perlin instance.
+    *   `exposureState`: `{ currentBias, targetBias, velocity }`.
+*   **Logic (Tick):**
+    *   **Auto-Exposure Hunting:**
+        *   Read current frame average luma (from 1x1 mipmap download).
+        *   Calculate `targetEV` to center histogram.
+        *   Update `currentEV` using a spring simulation (under-damped) so it overshoots and settles.
+    *   **Gate Weave:**
+        *   `weaveX = noise(time * 0.5) * amp`.
+        *   `weaveY = noise(time * 0.4 + 100) * amp`.
+    *   **White Balance Drift:**
+        *   Slow sine wave oscillation on Tint/Temp.
+*   **Outputs:** Defines the uniforms `uEVBias`, `uWeaveOffset`, `uWBTint` for other modules.
 
-  * Toe (logistic), straight-line mid, shoulder (soft knee).
-  * Ensure **monotonic** curve; preserve neutral mid-gray (0.18) mapping via constraint.
-  * If `enableCrossover`, apply mild channel-dependent shoulder softening.
-* GPU: single texture lookup per channel.
+### 4.4 CodecArtifactsModule (The "MiniDV" Look)
+**Objective:** Simulate digital compression damage.
 
-**Outputs**
+*   **Inputs:** `uTexSRGB` (Display ready).
+*   **Algorithm:**
+    1.  **RGB to YCbCr conversion.**
+    2.  **Chroma Subsampling:**
+        *   Write `Y` to full-res buffer.
+        *   Write `CbCr` to `Width/4` buffer (4:1:1 NTSC DV) or `Width/2` (4:2:2).
+        *   Upscale `CbCr` back to full size using `GL_NEAREST` (hard edges) or `GL_LINEAR` (smear).
+    3.  **Macroblocking:**
+        *   Snap UV coords to 8x8 grid: `blockUV = floor(uv * blocks) / blocks`.
+        *   Mix original pixel with blocked pixel based on `uBitrate`.
+    4.  **Mosquito Noise:**
+        *   Detect edges (Sobel).
+        *   Add high-frequency noise *only* near edges.
+    5.  **YCbCr to RGB conversion.**
+*   **Parameters:**
+    *   `subsampling`: [None, 4:2:2, 4:2:0, 4:1:1]
+    *   `compression`: [0.0 - 1.0]
+    *   `mosquito`: [0.0 - 0.5]
 
-* RGB in **linear** for subsequent optics.
+### 4.5 Halation (Physically Accurate)
+**Objective:** Red light scattering through the film base.
 
-**Parameters**
+*   **Inputs:** `uTexLog` (Density).
+*   **Algorithm:**
+    1.  **Threshold:** Isolate `Red` channel where `brightness > uThreshold`.
+    2.  **Scatter:** Apply broad Gaussian blur (sigma ~20px) to this isolated Red channel.
+    3.  **Masking:** Sample the `Cyan` layer (Red's complement). If the film is dense (dark), halation is blocked. If thin (bright/transparent), halation passes.
+    4.  **Composite:** Add the blurred red glow back onto the original image.
+*   **Parameters:**
+    *   `threshold`: [0.7 - 1.0]
+    *   `radius`: [0.0 - 50.0]
+    *   `intensity`: [0.0 - 1.0]
 
-* `toe` [0..0.4], `mid` [0.2..0.8], `shoulder` [0..0.5], `contrastTrim` [-0.2..0.2], `crossoverRGB` ~ ±0.02
+### 4.6 Gate Weave (Mechanical)
+**Objective:** Film strip vibrating in the gate.
 
-**Acceptance**
-
-* Step wedge test produces film-like roll-off; R/G/B track closely with slight divergence in highlights when crossover > 0.
-
----
-
-### 4.2 LensOpticsModule (MTF & Falloff)
-
-**Objective:** Simulate lens resolving power and field behavior.
-
-**Inputs**
-
-* `uTex` (linear), `uPx` (1/width, 1/height)
-* Uniforms: `uSigma` (base blur), `uEdgeFalloff`, `uRinging`, `uBarrel`, `uFieldCurvature`
-
-**Algorithm (MVV)**
-
-1. **Base MTF rolloff:** separable Gaussian (5–7 taps) with σ = `uSigma`.
-2. **Edge falloff:** multiplicative radial mask `mask = mix(1, 1 - smoothstep(r0,r1,r^2), uEdgeFalloff)`.
-3. **Optional barrel distortion:** warp UV `uv' = uv + k*(uv-0.5)*|uv-0.5|^2`.
-4. **Optional ringing:** light unsharp masking with **non-negative clamp** to avoid dark halos.
-
-**Outputs**
-
-* RGB linear
-
-**Parameters**
-
-* `mtfSigma` [0..1.5], `edgeFalloff` [0..1], `ringing` [0..0.5], `barrel` [0..0.03], `fieldCurvature` [0..0.02]
-
-**Acceptance**
-
-* Slanted-edge MTF chart shows softening & slight corner drop; ringing only when enabled and small.
-
----
-
-### 4.3 TemporalInstability (CPU controller)
-
-**Objective:** Subtle, slow changes over time: luminance flicker, white-balance drift, gate weave.
-
-**State**
-
-* `evBias`, `wbGains` (vec3 around 1.0), `weaveOffset` (x,y), `weaveRot` (radians), each as bounded random walks seeded by `seed + moduleOffset`.
-
-**Algorithm**
-
-* Each frame `t`:
-
-  * `evBias ← clamp(evBias + N(0, σ_ev), [-0.01, 0.01])`
-  * `wbGains.c ← clamp(wbGains.c + N(0, σ_wb), [0.985, 1.015])`
-  * `weaveOffset ← weaveOffset + N2(0, σ_xy)`, clamp to ±0.3 px; `weaveRot ← clamp(weaveRot + N(0,σ_rot), ±0.06°)`
-* Provide uniforms to:
-
-  * ExposureFlash (add EV bias; multiply WB gains post-filmic if desired).
-  * A lightweight **WeavePass**: transform quad vertices by `(translate, rotate)` before sampling the current texture.
-
-**Parameters**
-
-* `flicker` [0..0.01], `wbDrift` [0..0.01], `weave` [0..0.005]
-
-**Acceptance**
-
-* With handheld OFF, stepping frames shows tiny float without judder; luma varies <0.5% RMS over 2–3 s windows.
-
----
-
-### 4.4 OutputFormat (Downsample + Cadence)
-
-**Objective:** Era-correct native size/framerate and a “Native Output Preview.”
-
-**Inputs**
-
-* `targetRes`: presets (`480p_720x480`, `960x540`, `720p`, custom WxH)
-* `targetFPS`: {24, 25, 29.97, 30} (extendable)
-* `previewNative`: bool
-
-**Downsample**
-
-* Option A (fast): pre-blur σ≈0.6 then bilinear to target.
-* Option B (better): single-pass bicubic/Mitchell-Netravali kernel.
-
-**Cadence**
-
-* Render/export clock runs at targetFPS; for preview, when app < native FPS, do nearest or 2-tap frame blend `c = (1-α)*prev + α*curr` to soften judder.
-
-**Acceptance**
-
-* Pixel-exact equality between Native Preview and Export at same settings; cadence toggling changes motion feel immediately.
+*   **Inputs:** Vertex Shader Uniform `uWeaveOffset` (from TemporalController).
+*   **Algorithm:**
+    *   In Vertex Shader: `gl_Position = vec4(a_pos + uWeaveOffset, 0.0, 1.0);`
+    *   *Note:* This moves the image content relative to the viewport border. If we add an "Overscan" border later, this allows the black edge to wiggle visible.
+*   **Parameters:**
+    *   `amplitude`: [0.0 - 0.005] (Screen space)
+    *   `frequency`: [0.0 - 10.0] (Hz)
 
 ---
 
-### 4.5 CodecArtifacts
+## 5) API & Wiring (App Structure)
 
-**Objective:** Recreate key digital/video artifacts.
+### 5.1 Updated Module Interface
+We need to be explicit about color space requirements.
 
-**Inputs**
-
-* RGB (sRGB for final composite is fine)
-
-**Pipeline (MVV)**
-
-1. **YCbCr convert.**
-2. **Chroma subsampling:** downsample Cb/Cr to half res (or 1/4 for 4:1:1), upsample with nearest or linear → **bleed**.
-3. **Block/Ringing mask:** build 8×8 energy by sampling local gradient; near strong edges, apply tiny overshoot kernel.
-4. **Mosquito noise:** add small, edge-proximate high-freq “buzz” masked by gradient magnitude.
-
-**Parameters**
-
-* `subsampleMode` {4:2:0, 4:1:1, off}, `chromaBleed` [0..1], `ringing` [0..0.5], `mosquito` [0..0.5]
-
-**Acceptance**
-
-* Fine colored edges show characteristic color spread; thin text exhibits faint halo/mosquito that disappears when disabled.
-
----
-
-### 4.6 Interlacing + HeadSwitch (camcorder)
-
-**Objective:** Field-based rendering and head-switch noise strip.
-
-**Algorithm**
-
-* **Interlace synth:** Render full frame, then compose two fields: odd/even lines from different timestamps (for preview, allow same frame). Option to add 0.5-line vertical offset to one field.
-* **Head switch:** bottom N lines add noise/phase shift and minor horizontal jitter.
-
-**Parameters**
-
-* `interlace` bool, `deintSoftness` [0..1], `headSwitch` [0..1], `headSwitchHeightPx` default 6–12 px
-
-**Acceptance**
-
-* Stepping frames shows classic combing on motion; bottom band visible at non-zero `headSwitch`.
-
----
-
-### 4.7 RollingShutter + SharpenHalo (early iPhone)
-
-**Objective:** CMOS scan skew and aggressive in-camera sharpening.
-
-**Algorithm**
-
-* **Rolling shutter:** for each fragment `y`, offset UV by `rsAmount * (y * pxY) * motionProxy`, where motionProxy derives from handheld parameters or recent frame difference energy.
-* **Sharpen halo:** unsharp mask with overshoot clamp slightly above 1.0 (e.g., 1.04) to create bright halos.
-
-**Parameters**
-
-* `rsAmount` [0..1], `haloStrength` [0..1], `haloRadius` [0.5..2.0]
-
-**Acceptance**
-
-* Horizontal pans show vertical lines leaning; halos visible on high-contrast edges at modest strengths.
-
----
-
-### 4.8 CCD Vertical Smear + Anamorphic Bloom
-
-**Objective:** CCD highlight streaks and anamorphic flavor.
-
-**Algorithm**
-
-* **Smear:** bright threshold → 1D vertical blur with exponential falloff; additively composited.
-* **Anamorphic bloom:** reuse bloom but stretch blur kernel in X; adjustable aspect.
-
-**Parameters**
-
-* `ccdSmear` [0..1], `smearDecay` [0.2..2.0], `bloomAnamorph` [1.0..4.0]
-
-**Acceptance**
-
-* Point highlights produce vertical streaks; bloom stretches horizontally as ratio rises.
-
----
-
-### 4.9 SparseDefects + LightLeaks
-
-**Objective:** Rare, tasteful defects.
-
-**Algorithm**
-
-* **Dust/Specks:** per-minute Poisson process; small white/black dots with soft edges.
-* **Scratches:** thin vertical lines with intermittent gaps; drift slowly.
-* **Light leaks:** edge-anchored color gradients, temporally gated on/off.
-
-**Parameters**
-
-* `defectRate` [0..1], `scratchProb` [0..1], `leakStrength` [0..1], `leakHue` [0..1]
-
-**Acceptance**
-
-* At default values, defects appear infrequently; turning rates up makes effect obvious for QA.
-
----
-
-### 4.10 OSD / DateStamp
-
-**Objective:** Period-correct on-frame text.
-
-**Algorithm**
-
-* Raster a 7-segment font into a small atlas; draw with slight blur, subpixel offset jitter, and faint glow/bleed.
-* Support `YYYY.MM.DD`, `MM.DD.YY`, time, “ISO 400/800” badges.
-
-**Parameters**
-
-* `dateOn` bool, `dateFormat` enum, `osdAging` [0..1], `osdPosition` (corner presets)
-
-**Acceptance**
-
-* Crisp but slightly bloomed digits; subtle frame-to-frame subpixel jitter when enabled.
-
----
-
-### 4.11 InstantFilm (Polaroid)
-
-**Objective:** Chemical spread, developer bloom, paper & frame.
-
-**Algorithm (staged)**
-
-1. **Developer bloom:** high-luma near borders gets soft additive glow.
-2. **Uneven chemical spread:** low-freq multiplicative mask varying across frame.
-3. **Paper texture:** normal-mapped paper grain; lit with tiny fake oblique light to reveal tooth.
-4. **Frame composite:** scan-like border with drop shadow option.
-
-**Parameters**
-
-* `devBloom` [0..1], `chemStreak` [0..1], `paperTexture` enum, `frameStyle` enum
-
-**Acceptance**
-
-* Whites near edges look “milky”; paper grain visible at angle; frame looks photographic, not vector-clean.
-
----
-
-### 4.12 AE/AWB Hunt (CPU)
-
-**Objective:** Simulate consumer device auto-exposure and WB hunting.
-
-**Algorithm**
-
-* Frame histogram → target exposure; apply PID-like controller with intentional overshoot and slow settle.
-* WB target from gray world or highlights; add latency and noise.
-
-**Parameters**
-
-* `aeSensitivity` [0..1], `awbSensitivity` [0..1], `huntOvershoot` [0..0.2]
-
-**Acceptance**
-
-* Cuts cause brief over/under-shoot; color temp drifts before settling.
-
----
-
-### 4.13 Negative → Print pipeline (advanced)
-
-**Objective:** Proper color negative modeling.
-
-**Stages**
-
-* Linear scene → **Camera Neg Log** (with orange mask) → **Print LUT** → sRGB.
-* Optional: place **Grain** before scan stage for “in-negative” feel.
-
-**Parameters**
-
-* `negMode` bool, `orangeMask` strength, `printContrast`, LUT selector
-
-**Acceptance**
-
-* Accurate neutralization of orange mask; pleasing filmic colors without heavy secondary grading.
-
----
-
-## 5) API & Wiring (app structure)
-
-### 5.1 Module interface (JS)
-
-```js
+```javascript
 class ModuleX {
-  constructor(gl, quad) { /* compile, uniforms */ }
+  constructor(gl, quad) { ... }
+  
+  // Define requirements for pipeline validation
+  get inputSpace() { return 'linear'; } // or 'log', 'srgb'
+  get outputSpace() { return 'linear'; }
+
   apply(inputTex, outputFB, params, ctx) {
-    // ctx: { pxX, pxY, frame, seed, canvasW, canvasH, colorSpaceFlags, ... }
+    // ctx now includes:
+    // - time, dt
+    // - temporal: { evBias, weave, wb }
+    // - resolution info
   }
-  // optional: prepass/postpass or resize handlers
 }
 ```
 
-### 5.2 UI contract
-
-* **PARAMS maps**: `min/max/step/default/label/special` per module.
-* **TAB_CONFIG**: group new modules under **Response**, **Optics**, **Temporal**, **Output**, **Artifacts**, **Medium**.
-* **Preset Manager**: load/save JSON (schema below), hot-swap values → mark `needsRender`.
-
-### 5.3 Preset schema (JSON)
+### 5.2 Preset Schema (JSON)
+Presets now define the *mode* (Analog vs Digital) which alters the pipeline.
 
 ```json
 {
-  "name": "MiniDV 2004",
-  "native": { "width": 720, "height": 480, "fps": 29.97, "interlace": true },
-  "seed": 1337,
+  "id": "kodak_gold_2003",
+  "label": "Summer 2003 (Disposable)",
+  "pipeline_mode": "analog", 
   "params": {
-    "ExposureFlash": { "ev": -0.10, "flashStrength": 0.0 },
-    "FilmicResponse": { "toe": 0.12, "mid": 0.50, "shoulder": 0.34, "crossoverRGB": [0.01, 0.0, -0.01] },
-    "LensOptics": { "mtfSigma": 0.9, "edgeFalloff": 0.25, "barrel": 0.01, "ringing": 0.05 },
-    "TemporalInstability": { "flicker": 0.004, "wbDrift": 0.003, "weave": 0.002 },
-    "Bloom": { "intensity": 0.15, "warm": 0.1, "anamorph": 1.0, "ccdSmear": 0.25 },
-    "RollingShutter": { "rsAmount": 0.0 },
-    "MotionBlur": { "shutterUI": 0.12, "shake": 0.2, "motionAngle": 0.0 },
-    "Grain": { "filmSpeed": 400, "grainCharacter": 0.55, "grainChroma": 0.30, "placement": "pre_resize" },
-    "OutputFormat": { "targetRes": "720x480", "targetFPS": 29.97, "previewNative": true },
-    "Interlace": { "enabled": true, "headSwitch": 0.2, "deintSoft": 0.15 },
-    "CodecArtifacts": { "subsampleMode": "4:1:1", "chromaBleed": 0.7, "ringing": 0.25, "mosquito": 0.15 },
-    "OSD": { "dateOn": true, "dateFormat": "MM.DD.YY" }
+    "Exposure": { "ev": 0.0 },
+    "LensOptics": { "edgeBlur": 1.5, "falloff": 2.2 },
+    "FilmicResponse": { 
+      "toe": 0.15, 
+      "gamma": 1.1, 
+      "crossover": [0.02, 0.0, -0.01] 
+    },
+    "Temporal": { "weaveAmp": 0.001 },
+    "Grain": { "iso": 400, "chroma": 0.5 },
+    "Output": { "fps": 24 }
+  }
+}
+```
+
+```json
+{
+  "id": "digicam_2007",
+  "label": "MySpace Cam (2007)",
+  "pipeline_mode": "digital_ccd",
+  "params": {
+    "Exposure": { "flash_falloff": 8.0 },
+    "LensOptics": { "edgeBlur": 0.2 },
+    "FilmicResponse": { "gamma": 1.0, "toe": 0.0 }, 
+    "CCDSmear": { "threshold": 0.9, "length": 0.5 },
+    "CodecArtifacts": { "subsampling": "4:2:0", "compression": 0.6 }
   }
 }
 ```
 
 ---
 
-## 6) Implementation Notes (per module)
+## 6) Implementation Notes
 
-* **Shaders:** stay WebGL2-friendly; provide WebGL1 fallback when cheap (no integer samplers).
-* **Framebuffers:** reuse existing ping-pong `rtA/rtB` plus half/quarter/eighth levels for bloom; add half-res attachments for chroma passes.
-* **WeavePass:** tiny transform on fullscreen quad; ensure it composes with Handheld (apply weave *before* handheld or vice versa, but keep stable).
-* **Rolling shutter motion proxy:** If no optical flow, approximate with recent camera transform deltas (handheld) or mean frame diff magnitude.
-* **Performance budget:** aim <2 ms per added pass at 1080p on mid GPU. Make heavier passes scale with preview resolution.
-* **Non-negativity:** replicate clarity’s “no negative lobes” rule in any sharpen/ringing stage.
+*   **Shaders:** Use `#define` guards for Color Space conversions in common headers.
+    ```glsl
+    // common.glsl
+    vec3 linToLog(vec3 c) { ... }
+    vec3 logToLin(vec3 c) { ... }
+    vec3 linToSRGB(vec3 c) { ... }
+    ```
+*   **Framebuffers:**
+    *   Keep `rtA`/`rtB` for the main chain.
+    *   Add `rtChroma` (Quarter res) for Codec artifacts.
+    *   Reuse Bloom buffers (`rtH`, `rtQ`) for Halation generation to save VRAM.
+*   **Performance Budget:**
+    *   Lens Blur is expensive (large kernel). Optimization: Only run high-quality blur on `rtA`. If fps < 30, degrade to a lower tap count or simple vignette blur.
+*   **Export:**
+    *   The `TemporalController` must support a `seek(time)` method or be deterministically stepped (`seed + frameIndex`) so that exports don't jump around differently than the preview.
 
 ---
 
 ## 7) QA / Bench Tests
 
-### 7.1 Unit-style visual tests
+### 7.1 Visual Unit Tests
+*   **Filmic Ramp:** Input a horizontal 0-1 gradient. Output must be a smooth curve. If `Crossover` is enabled, the white end must show a tint.
+*   **Lens Blur:** Input a grid pattern. Center grid lines should be sharp (1px). Corner grid lines should be blurred (~3px).
+*   **Codec:** Input red text on black background. Enable `4:1:1`. The red should bleed horizontally by 4 pixels.
 
-* **FilmicResponse:** gray ramp → verify monotonic mapping and channel crossover in highlights only when enabled.
-* **MTF:** slanted-edge chart → extract MTF50; assert reduction matches `mtfSigma`.
-* **Temporal:** log EV/WB/Weave over 10 s → RMS within target.
-* **OutputFormat:** downsample→export→compare pixel-wise equality with preview.
-* **Codec:** colored Siemens star → verify chroma bleed; text halo thresholds.
-* **Interlace:** moving bar pattern → combing visible on odd frames.
-
-### 7.2 Golden presets
-
-* Create “golden” renders for each preset using fixed seed and short test clips; diffs must be < ε between runs.
+### 7.2 Golden Master Tests
+*   Render "Frame 50" of "Big Buck Bunny" with the "Kodak Gold" preset.
+*   Store the `Uint8Array` hash.
+*   Any change to math/shaders must verify this hash or prompt a manual review of the visual change.
 
 ---
 
 ## 8) Developer Tasks & Milestones
 
-### Milestone A (P0 foundation)
+### Milestone A (P0: The Physics Core)
+1.  **Refactor:** Rename all shader uniforms in existing modules (`uTex` -> `uTexLin`). Ensure `Exposure` output is Linear.
+2.  **New Module:** `LensOpticsModule`. Implement radial blur shader.
+3.  **New Module:** `FilmicResponseModule`. Implement H-Curve math. Wire up UI sliders.
+4.  **Cleanup:** Remove `ToneModule`.
 
-1. **FilmicResponseModule** (1D LUT) + UI parameters + preset scaffold.
-2. **LensOptics/MTF** (separable + edge falloff + optional barrel).
-3. **TemporalInstability** (CPU controller + WeavePass).
-4. **OutputFormat** (downsample + cadence + Native Preview).
-5. **CodecArtifacts** (YCbCr subsample + light ringing/mosquito).
-   **Deliverables:** 3 “era” presets (35 mm consumer, MiniDV 2004, Early iPhone 2010) with A/B tests.
+### Milestone B (P1: Temporal & Digital)
+5.  **Architecture:** Create `TemporalController.js`. Hook it up to `Exposure` (Bias) and `Handheld` (Transform).
+6.  **New Module:** `CodecArtifacts`. Implement YUV subsampling FBOs.
+7.  **Refactor:** Update `renderer-export.js` to use the new `TemporalController` with deterministic seeding.
 
-### Milestone B (P1 medium tells)
-
-6. **Interlacing + HeadSwitch** path.
-7. **RollingShutter + SharpenHalo**.
-8. **CCD Vertical Smear + Anamorphic Bloom** (flag inside Bloom module).
-9. **SparseDefects + LightLeaks** (global sparse controller).
-10. **OSD/DateStamp** overlay.
-    **Deliverables:** 5 polished presets (add Polaroid-ish still & Hi8) + sample exports.
-
-### Milestone C (P2 mastery)
-
-11. **InstantFilm** (chem/paper/frame) with asset pipeline.
-12. **AE/AWB Hunt** controller.
-13. **Negative→Print** experimental path (behind feature flag).
-    **Deliverables:** “Instant” and “Lab Scan” presets, documentation.
+### Milestone C (P2: Polish)
+8.  **New Module:** `Halation`. Red-channel scatter.
+9.  **Preset System:** Build the JSON loader/saver and the UI dropdown.
+10. **Output:** Add "Date Stamp" overlay logic (simple atlas rendering).
 
 ---
 
-## 9) Developer Ergonomics
-
-* **Preset Manager UI:** import/export JSON, duplicate, quick-compare (A/B hotkey).
-* **Seed Discipline:** `globalSeed` + per-module offsets (`seed ^ 0x9E3779B9 * moduleIndex`).
-* **Profile overlay:** on-screen ms per pass; warn when any pass >3 ms at 1080p.
-* **Error Bars:** clamp parameters in UI; show tooltips with realism guidance.
-* **Native Preview Toggle:** icon with the target resolution & FPS label.
-
----
-
-## 10) Security & Export Parity
-
-* **Electron**: context isolation on; minimal `electronAPI` surface (export start/progress/finish).
-* **Parity checks**: auto-run a short export pipeline test at build time that compares headless export to on-screen Native Preview for a fixed seed/clip.
-
----
-
-## 11) File/Code Skeletons (drop-in)
+## 9) File/Code Skeletons (Drop-in)
 
 **`web/modules/filmic-response.js`**
-
-```js
+```javascript
 export const FILMIC_PARAMS = {
-  toe:{min:0,max:0.4,step:0.005,default:0.10,label:'Toe'},
-  mid:{min:0.2,max:0.8,step:0.01,default:0.5,label:'Mid Gray'},
-  shoulder:{min:0,max:0.5,step:0.01,default:0.30,label:'Shoulder'},
-  contrastTrim:{min:-0.2,max:0.2,step:0.005,default:0.0,label:'Contrast Trim'},
-  crossoverR:{min:-0.03,max:0.03,step:0.001,default:0.0,label:'R Shoulder Δ'},
-  crossoverG:{min:-0.03,max:0.03,step:0.001,default:0.0,label:'G Shoulder Δ'},
-  crossoverB:{min:-0.03,max:0.03,step:0.001,default:0.0,label:'B Shoulder Δ'},
-  enableCrossover:{min:0,max:1,step:1,default:0,label:'Enable Crossover'}
+  toe: { min: 0, max: 0.5, step: 0.01, default: 0.2, label: 'Toe (Shadows)' },
+  gamma: { min: 0.8, max: 1.8, step: 0.01, default: 1.1, label: 'Contrast' },
+  shoulder: { min: 0.5, max: 1.0, step: 0.01, default: 0.8, label: 'Shoulder' },
+  whitePoint: { min: 1.0, max: 4.0, step: 0.1, default: 2.0, label: 'Dynamic Range' },
+  crossover: { min: -0.1, max: 0.1, step: 0.01, default: 0.0, label: 'Chem Crossover' }
 };
-// class FilmicResponseModule { constructor(gl,quad){...} apply(inputTex, outputFB, p, ctx){...} }
+
+const FRAGMENT_SHADER = `
+precision highp float;
+varying vec2 v_uv;
+uniform sampler2D uTexLin;
+uniform float uToe, uGamma, uShoulder, uWhitePoint, uCrossover;
+
+// ... Helper log/lin functions ...
+
+void main() {
+  vec3 col = texture2D(uTexLin, v_uv).rgb;
+  
+  // Apply crossover to linear data before compression
+  // e.g. Red saturates earlier (warmer highlights)
+  vec3 whitePts = vec3(uWhitePoint) + vec3(uCrossover, 0.0, -uCrossover);
+  
+  // Normalize to white point
+  col = col / whitePts;
+
+  // Apply H-Curve (Simplified Reinhard-ish for placeholder)
+  vec3 x = col;
+  // Toe/Shoulder logic goes here...
+  
+  gl_FragColor = vec4(col, 1.0); // Output is now in Log space
+}
+`;
 ```
 
-**`web/modules/lens-optics.js`**
+**`web/controllers/temporal-controller.js`**
+```javascript
+import { SimplexNoise } from '../utils/noise.js'; // Assume utility exists
 
-```js
-export const LENS_OPTICS_PARAMS = {
-  mtfSigma:{min:0,max:1.5,step:0.05,default:0.6,label:'MTF Blur'},
-  edgeFalloff:{min:0,max:1,step:0.01,default:0.2,label:'Edge Falloff'},
-  ringing:{min:0,max:0.5,step:0.01,default:0.0,label:'Ringing'},
-  barrel:{min:0,max:0.03,step:0.001,default:0.0,label:'Barrel Distortion'}
-};
+export class TemporalController {
+  constructor(seed = 0) {
+    this.noise = new SimplexNoise(seed);
+    this.time = 0;
+    this.params = {
+      exposureHunting: 0.0, // 0 to 1
+      gateWeave: 0.0        // 0 to 1
+    };
+  }
+  
+  update(dt, sceneLuma) {
+    this.time += dt;
+    
+    // Calculate Exposure Bias (Hunting)
+    // If sceneLuma changed rapidly, targetEV shifts, currentEV lags behind.
+    // ... PID logic ...
+    
+    // Calculate Weave
+    const weaveFreq = 2.0;
+    this.weaveX = this.noise.noise2D(this.time * weaveFreq, 0) * this.params.gateWeave * 0.005;
+    this.weaveY = this.noise.noise2D(this.time * weaveFreq, 100) * this.params.gateWeave * 0.005;
+  }
+  
+  getUniforms() {
+    return {
+      uTempExposure: this.exposureBias,
+      uWeaveOffset: [this.weaveX, this.weaveY]
+    };
+  }
+}
 ```
-
-**`web/controllers/temporal-instability.js`**
-
-```js
-export const TEMPORAL_PARAMS = {
-  flicker:{min:0,max:0.01,step:0.0001,default:0.003,label:'Luma Flicker'},
-  wbDrift:{min:0,max:0.01,step:0.0001,default:0.003,label:'WB Drift'},
-  weave:{min:0,max:0.005,step:0.0001,default:0.0015,label:'Gate Weave'}
-};
-// tick(ctx): mutates ctx.evBias, ctx.wb, ctx.weaveTransform
-```
-
-**`web/modules/output-format.js`**
-
-```js
-export const OUTPUT_PARAMS = {
-  targetRes:{min:0,max:0,step:0,default:'960x540',label:'Target Resolution'},
-  targetFPS:{min:0,max:0,step:0,default:29.97,label:'Target FPS'},
-  previewNative:{min:0,max:1,step:1,default:1,label:'Native Output Preview'}
-};
-```
-
-**`web/modules/codec-artifacts.js`**
-
-```js
-export const CODEC_PARAMS = {
-  subsampleMode:{min:0,max:2,step:1,default:1,label:'Chroma Mode (0=off,1=420,2=411)'},
-  chromaBleed:{min:0,max:1,step:0.01,default:0.6,label:'Chroma Bleed'},
-  ringing:{min:0,max:0.5,step:0.01,default:0.2,label:'Ringing'},
-  mosquito:{min:0,max:0.5,step:0.01,default:0.1,label:'Mosquito'}
-};
-```
-
-(Other skeletons analogous; keep class pattern consistent with existing modules.)
 
 ---
 
-## 12) Risks & Mitigations
+## 10) Risks & Mitigations
 
-* **Performance regressions:** Keep passes separable where possible; expose “Preview Quality” that lowers taps at edit time and restores full taps on export.
-* **Order coupling:** Encode pipeline order centrally; add a unit test that asserts relative stage ordering.
-* **Parameter explosion:** Provide preset-first UX; hide advanced controls behind “expert” toggles.
-* **Export mismatch:** Automated parity test with fixed seed, clip, and preset on CI.
-
----
-
-## 13) Documentation & Onboarding
-
-* Update the Developer Guide with: pipeline diagram, module list & order, parameter glossary, color-space rules, preset schema, and profiling tips.
-* Add “How to create a new medium preset” doc (copy a base preset, tweak 6–8 key parameters, capture golden frames).
-* Provide a small *test footage pack* (pan, tilt, fine patterns, highlights, faces, night city) for QA.
+*   **Risk:** **Texture Banding.** Heavy processing in Log space on 8-bit textures can cause banding.
+    *   **Mitigation:** We are already using `HALF_FLOAT` (Float16) textures in `gl-context.js`. Verify this is active on all targets. If mobile falls back to `UNSIGNED_BYTE`, add dithering at the end of `FilmicResponse`.
+*   **Risk:** **Pipeline Complexity.** 10+ passes might kill the frame rate on integrated GPUs.
+    *   **Mitigation:** Add a "Quality" toggle in UI. "High" = full separable blurs. "Low" = single pass approximate blurs.
+*   **Risk:** **Export Divergence.** JS floats vs GPU floats.
+    *   **Mitigation:** The visual tests (7.1) are crucial. If `CodecArtifacts` looks different on Export, check if the `OutputFormat` module handles resizing differently in the headless window.
 
 ---
 
 ### Final Note
 
-Ship **P0** first (FilmicResponse, LensOptics/MTF, TemporalInstability, OutputFormat, CodecArtifacts). The moment those land with a couple of tuned presets, your footage will begin to pass the “did this come from a real device?” sniff test. P1 mediums then add the unmistakable tells; P2 is the polish that makes colorists and editors happy.
+Ship **P0** first. The moment you replace the S-Curve with the **H-Curve** (`FilmicResponse`) and add **Lens Softness** (`LensOptics`), the "video filter" look disappears. It stops looking like an overlay and starts looking like a recording.
