@@ -1,18 +1,55 @@
+// ===== START OF FILE: webphy/web/modules/bloom-vignette-optics.js ===== //
 // Bloom, Vignette, and Optical Effects Module
 // Bloom extraction, blur pyramid, vignette, chromatic aberration, clarity
 
-import { compileShader, bindProgram } from '../gl-context.js';
+import { compileShader, bindProgram } from "../gl-context.js";
 
 export const BLOOM_VIGNETTE_OPTICS_PARAMS = {
-  bloomThreshold: { min: 0.2, max: 1, step: 0.001, default: 0.358, label: 'Bloom Threshold' },
-  bloomRadius: { min: 1, max: 60, step: 0.1, default: 11.2, label: 'Bloom Radius' },
-  bloomIntensity: { min: 0, max: 3, step: 0.01, default: 0.45, label: 'Bloom Intensity' },
-  bloomWarm: { min: 0, max: 1, step: 0.01, default: 0.0, label: 'Bloom Warmth' },
-  halation: { min: 0, max: 2, step: 0.01, default: 0.60, label: 'Halation' },
-  vignette: { min: 0, max: 0.5, step: 0.001, default: 0.0, label: 'Vignette' },
-  vignettePower: { min: 1, max: 5, step: 0.01, default: 1.0, label: 'Vignette Power' },
-  ca: { min: 0, max: 2, step: 0.01, default: 0.27, label: 'Chromatic Aberration' },
-  clarity: { min: 0, max: 0.3, step: 0.01, default: 0.0, label: 'Clarity' }
+  bloomThreshold: {
+    min: 0.2,
+    max: 1,
+    step: 0.001,
+    default: 0.8,
+    label: "Bloom Threshold",
+  },
+  bloomRadius: {
+    min: 1,
+    max: 60,
+    step: 0.1,
+    default: 10.0,
+    label: "Bloom Radius",
+  },
+  bloomIntensity: {
+    min: 0,
+    max: 3,
+    step: 0.01,
+    default: 0.0,
+    label: "Bloom Intensity",
+  },
+  bloomWarm: {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0.0,
+    label: "Bloom Warmth",
+  },
+  halation: { min: 0, max: 2, step: 0.01, default: 0.0, label: "Halation" },
+  vignette: { min: 0, max: 0.5, step: 0.001, default: 0.0, label: "Vignette" },
+  vignettePower: {
+    min: 1,
+    max: 5,
+    step: 0.01,
+    default: 1.0,
+    label: "Vignette Power",
+  },
+  ca: {
+    min: 0,
+    max: 2,
+    step: 0.01,
+    default: 0.0,
+    label: "Chromatic Aberration",
+  },
+  clarity: { min: 0, max: 0.3, step: 0.01, default: 0.0, label: "Clarity" },
 };
 
 const VERTEX_SHADER = `
@@ -31,7 +68,9 @@ uniform vec2 uRes;
 float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 `;
 
-const BLOOM_EXTRACT_SHADER = COMMON + `
+const BLOOM_EXTRACT_SHADER =
+  COMMON +
+  `
 uniform sampler2D uTex;
 uniform float uT, uWarm;
 vec3 warm(float a) { return mix(vec3(1.0), vec3(1.15, 1.0, 0.88), a); }
@@ -44,7 +83,9 @@ void main() {
 }
 `;
 
-const DOWNSAMPLE_SHADER = COMMON + `
+const DOWNSAMPLE_SHADER =
+  COMMON +
+  `
 uniform sampler2D uTex;
 uniform vec2 uTexel;
 void main() {
@@ -57,7 +98,9 @@ void main() {
 }
 `;
 
-const BLUR_SHADER = COMMON + `
+const BLUR_SHADER =
+  COMMON +
+  `
 uniform sampler2D uTex;
 uniform vec2 uTexel;
 uniform float uR;
@@ -76,7 +119,9 @@ void main() {
 }
 `;
 
-const UPSAMPLE_ADD_SHADER = COMMON + `
+const UPSAMPLE_ADD_SHADER =
+  COMMON +
+  `
 uniform sampler2D uLow, uHigh;
 uniform float uAdd;
 void main() {
@@ -86,7 +131,9 @@ void main() {
 }
 `;
 
-const BLOOM_COMPOSITE_SHADER = COMMON + `
+const BLOOM_COMPOSITE_SHADER =
+  COMMON +
+  `
 uniform sampler2D uBase, uBloom;
 uniform float uI, uHal;
 vec3 screen(vec3 a, vec3 b) { return 1.0 - (1.0 - a) * (1.0 - b); }
@@ -100,7 +147,9 @@ void main() {
 }
 `;
 
-const VIGNETTE_SHADER = COMMON + `
+const VIGNETTE_SHADER =
+  COMMON +
+  `
 uniform sampler2D uTex;
 uniform float uV, uP;
 void main() {
@@ -111,7 +160,9 @@ void main() {
 }
 `;
 
-const CLARITY_SHADER = COMMON + `
+const CLARITY_SHADER =
+  COMMON +
+  `
 uniform sampler2D uTex;
 uniform vec2 uPx;
 uniform float uAmt;
@@ -137,7 +188,9 @@ void main() {
 }
 `;
 
-const CA_SHADER = COMMON + `
+const CA_SHADER =
+  COMMON +
+  `
 uniform sampler2D uTex;
 uniform vec2 uPx;
 uniform float uCA;
@@ -158,7 +211,7 @@ export class BloomVignetteOpticsModule {
   constructor(gl, quad) {
     this.gl = gl;
     this.quad = quad;
-    
+
     this.programs = {
       bloomExtract: this.createProgram(BLOOM_EXTRACT_SHADER),
       downsample: this.createProgram(DOWNSAMPLE_SHADER),
@@ -167,180 +220,197 @@ export class BloomVignetteOpticsModule {
       bloomComposite: this.createProgram(BLOOM_COMPOSITE_SHADER),
       vignette: this.createProgram(VIGNETTE_SHADER),
       clarity: this.createProgram(CLARITY_SHADER),
-      ca: this.createProgram(CA_SHADER)
+      ca: this.createProgram(CA_SHADER),
     };
   }
-  
+
   createProgram(fragSource) {
     const gl = this.gl;
     const vs = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
     const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragSource);
-    
+
     const program = gl.createProgram();
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
-    
+
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Program link error:', gl.getProgramInfoLog(program));
+      console.error("Program link error:", gl.getProgramInfoLog(program));
       return null;
     }
-    
+
     return program;
   }
-  
+
   extractBright(inputTex, outputFB, threshold, warmth, canvasW, canvasH) {
     const gl = this.gl;
     const prog = this.programs.bloomExtract;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform1f(gl.getUniformLocation(prog, 'uT'), threshold);
-    gl.uniform1f(gl.getUniformLocation(prog, 'uWarm'), warmth);
-    
+
+    gl.uniform1f(gl.getUniformLocation(prog, "uT"), threshold);
+    gl.uniform1f(gl.getUniformLocation(prog, "uWarm"), warmth);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-  
+
   downsample(inputTex, inputW, inputH, outputFB, canvasW, canvasH) {
     const gl = this.gl;
     const prog = this.programs.downsample;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform2f(gl.getUniformLocation(prog, 'uTexel'), 1 / inputW, 1 / inputH);
-    
+
+    gl.uniform2f(gl.getUniformLocation(prog, "uTexel"), 1 / inputW, 1 / inputH);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-  
+
   blurHorizontalVertical(srcFB, dstFB, radius, canvasW, canvasH) {
     const gl = this.gl;
     const prog = this.programs.blur;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, srcFB.tex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstFB.fbo);
-    gl.uniform2f(gl.getUniformLocation(prog, 'uTexel'), 1 / srcFB.w, 0);
-    gl.uniform1f(gl.getUniformLocation(prog, 'uR'), radius);
+    gl.uniform2f(gl.getUniformLocation(prog, "uTexel"), 1 / srcFB.w, 0);
+    gl.uniform1f(gl.getUniformLocation(prog, "uR"), radius);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, dstFB.tex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, srcFB.fbo);
-    gl.uniform2f(gl.getUniformLocation(prog, 'uTexel'), 0, 1 / srcFB.h);
-    gl.uniform1f(gl.getUniformLocation(prog, 'uR'), radius);
+    gl.uniform2f(gl.getUniformLocation(prog, "uTexel"), 0, 1 / srcFB.h);
+    gl.uniform1f(gl.getUniformLocation(prog, "uR"), radius);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-  
+
   upsampleAdd(lowTex, highTex, outputFB, canvasW, canvasH) {
     const gl = this.gl;
     const prog = this.programs.upsampleAdd;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, lowTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uLow'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uLow"), 0);
+
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, highTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uHigh'), 1);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uHigh"), 1);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform1f(gl.getUniformLocation(prog, 'uAdd'), 1.0);
-    
+
+    gl.uniform1f(gl.getUniformLocation(prog, "uAdd"), 1.0);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-  
-  compositeBloom(baseTex, bloomTex, outputFB, intensity, halation, canvasW, canvasH) {
+
+  compositeBloom(
+    baseTex,
+    bloomTex,
+    outputFB,
+    intensity,
+    halation,
+    canvasW,
+    canvasH,
+  ) {
     const gl = this.gl;
     const prog = this.programs.bloomComposite;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, baseTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uBase'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uBase"), 0);
+
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, bloomTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uBloom'), 1);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uBloom"), 1);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform1f(gl.getUniformLocation(prog, 'uI'), intensity);
-    gl.uniform1f(gl.getUniformLocation(prog, 'uHal'), halation);
-    
+
+    gl.uniform1f(gl.getUniformLocation(prog, "uI"), intensity);
+    gl.uniform1f(gl.getUniformLocation(prog, "uHal"), halation);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-  
+
   applyVignette(inputTex, outputFB, amount, power, canvasW, canvasH) {
     const gl = this.gl;
     const prog = this.programs.vignette;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform1f(gl.getUniformLocation(prog, 'uV'), amount);
-    gl.uniform1f(gl.getUniformLocation(prog, 'uP'), power);
-    
+
+    gl.uniform1f(gl.getUniformLocation(prog, "uV"), amount);
+    gl.uniform1f(gl.getUniformLocation(prog, "uP"), power);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-  
+
   applyClarity(inputTex, outputFB, amount, pxX, pxY, canvasW, canvasH) {
     const gl = this.gl;
     const prog = this.programs.clarity;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform2f(gl.getUniformLocation(prog, 'uPx'), pxX, pxY);
-    gl.uniform1f(gl.getUniformLocation(prog, 'uAmt'), amount);
-    
+
+    gl.uniform2f(gl.getUniformLocation(prog, "uPx"), pxX, pxY);
+    gl.uniform1f(gl.getUniformLocation(prog, "uAmt"), amount);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
-  
-  applyChromaticAberration(inputTex, outputFB, amount, pxX, pxY, canvasW, canvasH) {
+
+  applyChromaticAberration(
+    inputTex,
+    outputFB,
+    amount,
+    pxX,
+    pxY,
+    canvasW,
+    canvasH,
+  ) {
     const gl = this.gl;
     const prog = this.programs.ca;
-    
+
     bindProgram(gl, prog, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
-    gl.uniform1i(gl.getUniformLocation(prog, 'uTex'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform2f(gl.getUniformLocation(prog, 'uPx'), pxX, pxY);
-    gl.uniform1f(gl.getUniformLocation(prog, 'uCA'), amount);
-    
+
+    gl.uniform2f(gl.getUniformLocation(prog, "uPx"), pxX, pxY);
+    gl.uniform1f(gl.getUniformLocation(prog, "uCA"), amount);
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }
+// ===== END OF FILE: webphy/web/modules/bloom-vignette-optics.js ===== //

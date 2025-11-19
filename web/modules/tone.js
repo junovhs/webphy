@@ -1,13 +1,32 @@
+// ===== START OF FILE: webphy/web/modules/tone.js ===== //
 // Tone Curve Module
 // S-curve, black crush, lifted blacks, highlight rolloff
 
-import { compileShader, bindProgram } from '../gl-context.js';
+import { compileShader, bindProgram } from "../gl-context.js";
 
 export const TONE_PARAMS = {
-  scurve: { min: 0, max: 1, step: 0.01, default: 0.0, label: 'S-curve' },
-  blacks: { min: 0, max: 0.15, step: 0.001, default: 0.011, label: 'Black Crush' },
-  blackLift: { min: 0, max: 0.15, step: 0.001, default: 0.048, label: 'Lifted Blacks' },
-  knee: { min: 0, max: 0.25, step: 0.001, default: 0.082, label: 'Highlight Knee' }
+  scurve: { min: 0, max: 1, step: 0.01, default: 0.0, label: "S-curve" },
+  blacks: {
+    min: 0,
+    max: 0.15,
+    step: 0.001,
+    default: 0.0,
+    label: "Black Crush",
+  },
+  blackLift: {
+    min: 0,
+    max: 0.15,
+    step: 0.001,
+    default: 0.0,
+    label: "Lifted Blacks",
+  },
+  knee: {
+    min: 0,
+    max: 0.25,
+    step: 0.001,
+    default: 0.0,
+    label: "Highlight Knee",
+  },
 };
 
 const VERTEX_SHADER = `
@@ -25,7 +44,9 @@ varying vec2 v_uv;
 uniform vec2 uRes;
 `;
 
-const TONE_SHADER = COMMON + `
+const TONE_SHADER =
+  COMMON +
+  `
 uniform sampler2D uTex;
 uniform float uSc, uBl, uKnee, uLift;
 
@@ -53,41 +74,45 @@ export class ToneModule {
     this.quad = quad;
     this.program = this.createProgram();
   }
-  
+
   createProgram() {
     const gl = this.gl;
     const vs = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
     const fs = compileShader(gl, gl.FRAGMENT_SHADER, TONE_SHADER);
-    
+
     const program = gl.createProgram();
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
-    
+
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error('Tone program link error:', gl.getProgramInfoLog(program));
+      console.error("Tone program link error:", gl.getProgramInfoLog(program));
       return null;
     }
-    
+
     return program;
   }
-  
+
   apply(inputTex, outputFB, params, canvasW, canvasH) {
     const gl = this.gl;
-    
+
     bindProgram(gl, this.program, this.quad, canvasW, canvasH);
-    
+
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
-    gl.uniform1i(gl.getUniformLocation(this.program, 'uTex'), 0);
-    
+    gl.uniform1i(gl.getUniformLocation(this.program, "uTex"), 0);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
-    
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uSc'), params.scurve);
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uBl'), params.blacks);
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uKnee'), params.knee);
-    gl.uniform1f(gl.getUniformLocation(this.program, 'uLift'), params.blackLift);
-    
+
+    gl.uniform1f(gl.getUniformLocation(this.program, "uSc"), params.scurve);
+    gl.uniform1f(gl.getUniformLocation(this.program, "uBl"), params.blacks);
+    gl.uniform1f(gl.getUniformLocation(this.program, "uKnee"), params.knee);
+    gl.uniform1f(
+      gl.getUniformLocation(this.program, "uLift"),
+      params.blackLift,
+    );
+
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }
+// ===== END OF FILE: webphy/web/modules/tone.js ===== //
