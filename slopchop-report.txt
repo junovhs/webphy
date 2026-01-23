@@ -1,21 +1,21 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-23 13:47:32
+Generated: 2026-01-23 13:52:08
 Status: PASSED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
-  1    src\ui\sidebar.rs
+  5    src\ui\sidebar.rs
+  3    src\io\mod.rs
   1    src\ui\viewport.rs
   0    assets\css\main.css
   0    assets\js\renderer.js
-  0    Cargo.toml
 
 Top 5 Largest Files (Tokens):
-  1204  assets\js\renderer.js
+  1191  assets\js\renderer.js
   1125  assets\css\main.css
   699   src\params.rs
-  640   src\ui\sidebar.rs
-  339   README.md
+  673   src\ui\sidebar.rs
+  543   src\io\mod.rs
 
 === VIOLATIONS ===
 None. Codebase is clean.
@@ -23,29 +23,30 @@ None. Codebase is clean.
 === FULL OUTPUT LOGS ===
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic
-    Checking nitrate v0.1.0 (C:\Users\SpencerNunamakerTrav\nitrate)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.12s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.53s
 
 
 >>> COMMAND: cargo test
 
-running 9 tests
+running 12 tests
 test params::tests::clamp_midpoint_unchanged ... ok
-test params::tests::exposure_clamp_within_range_unchanged ... ok
-test params::tests::exposure_clamp_at_max_boundary ... ok
+test io::tests::image_error_display ... ok
+test params::tests::exposure_clamp_above_max_returns_max ... ok
 test params::tests::exposure_clamp_at_min_boundary ... ok
 test params::tests::exposure_clamp_below_min_returns_min ... ok
-test params::tests::exposure_clamp_above_max_returns_max ... ok
+test params::tests::exposure_clamp_within_range_unchanged ... ok
 test params::tests::grain_clamp_above_max_returns_max ... ok
-test params::tests::grain_clamp_below_min_returns_min ... ok
+test io::tests::load_nonexistent_returns_error ... ok
 test params::tests::halation_clamp_negative_returns_zero ... ok
+test params::tests::exposure_clamp_at_max_boundary ... ok
+test params::tests::grain_clamp_below_min_returns_min ... ok
+test io::tests::load_valid_image_returns_rgba_data ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-   Compiling nitrate v0.1.0 (C:\Users\SpencerNunamakerTrav\nitrate)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.06s
-     Running unittests src\main.rs (target\debug\deps\nitrate-b4df6de928f70c91.exe)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.47s
+     Running unittests src\main.rs (target\debug\deps\nitrate-491b2f13da0b8731.exe)
 
 
 >>> COMMAND: slopchop scan --locality

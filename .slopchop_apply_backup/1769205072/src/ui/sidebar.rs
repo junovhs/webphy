@@ -1,11 +1,10 @@
-use crate::io;
 use crate::params::{self, ParamDef};
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use tracing::{error, info};
+use tracing::info;
 
 #[component]
-pub fn Sidebar(image_data: Signal<Option<io::ImageData>>) -> Element {
+pub fn Sidebar(image_path: Signal<Option<String>>) -> Element {
     let mut exposure = use_signal(|| params::EXPOSURE.default);
     let mut grain = use_signal(|| params::GRAIN.default);
     let mut halation = use_signal(|| params::HALATION.default);
@@ -18,13 +17,9 @@ pub fn Sidebar(image_data: Signal<Option<io::ImageData>>) -> Element {
                 .await;
 
             if let Some(file) = file {
-                let path = file.path();
-                info!("Opening: {}", path.display());
-
-                match io::load_image(path) {
-                    Ok(data) => image_data.set(Some(data)),
-                    Err(e) => error!("Failed to load: {e}"),
-                }
+                let path = file.path().to_string_lossy().to_string();
+                info!("Opening: {path}");
+                image_path.set(Some(path));
             }
         });
     };

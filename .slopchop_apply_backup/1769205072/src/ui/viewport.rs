@@ -1,23 +1,20 @@
-use crate::io::ImageData;
-use base64::Engine;
 use dioxus::document::eval;
 use dioxus::prelude::*;
 
 #[component]
-pub fn Viewport(image_data: Signal<Option<ImageData>>) -> Element {
-    let has_image = image_data.read().is_some();
+pub fn Viewport(image_path: Signal<Option<String>>) -> Element {
+    let has_image = image_path.read().is_some();
 
     use_effect(move || {
-        if let Some(data) = image_data.read().as_ref() {
-            let b64 = base64::engine::general_purpose::STANDARD.encode(&data.pixels);
+        if let Some(path) = image_path.read().as_ref() {
+            let escaped = path.replace('\\', "/");
             let js = format!(
                 "setTimeout(() => {{
                     if (!window.Renderer.gl) {{
                         window.Renderer.init('viewport-canvas');
                     }}
-                    window.Renderer.loadPixels('{b64}', {}, {});
-                }}, 50);",
-                data.width, data.height
+                    window.Renderer.loadImage('file:///{escaped}');
+                }}, 50);"
             );
             eval(&js);
         }
