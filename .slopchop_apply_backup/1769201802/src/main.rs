@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-mod io;
 mod params;
 mod ui;
 
@@ -32,13 +31,11 @@ fn main() {
 }
 
 fn App() -> Element {
-    let image_data: Signal<Option<String>> = use_signal(|| None);
-
     rsx! {
         style { {MAIN_CSS} }
         div { class: "app",
-            ui::Sidebar { image_data }
-            ui::Viewport { image_data }
+            ui::Sidebar {}
+            ui::Viewport {}
         }
     }
 }

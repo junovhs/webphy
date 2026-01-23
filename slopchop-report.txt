@@ -1,21 +1,21 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-23 12:50:06
+Generated: 2026-01-23 13:02:06
 Status: PASSED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
+  5    src\ui\sidebar.rs
+  3    src\io\image.rs
   0    assets\css\main.css
   0    Cargo.toml
   0    Dioxus.toml
-  0    README.md
-  0    slopchop.toml
 
 Top 5 Largest Files (Tokens):
   1125  assets\css\main.css
+  821   src\io\image.rs
   699   src\params.rs
-  446   src\ui\sidebar.rs
+  596   src\ui\sidebar.rs
   339   README.md
-  292   slopchop.toml
 
 === VIOLATIONS ===
 None. Codebase is clean.
@@ -23,27 +23,34 @@ None. Codebase is clean.
 === FULL OUTPUT LOGS ===
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.39s
+    Checking nitrate v0.1.0 (C:\Users\SpencerNunamakerTrav\nitrate)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.28s
 
 
 >>> COMMAND: cargo test
 
-running 9 tests
-test params::tests::clamp_midpoint_unchanged ... ok
-test params::tests::exposure_clamp_below_min_returns_min ... ok
+running 14 tests
+test io::image::tests::image_error_display_file_not_found ... ok
 test params::tests::exposure_clamp_above_max_returns_max ... ok
-test params::tests::exposure_clamp_at_max_boundary ... ok
-test params::tests::grain_clamp_above_max_returns_max ... ok
-test params::tests::halation_clamp_negative_returns_zero ... ok
-test params::tests::exposure_clamp_at_min_boundary ... ok
 test params::tests::grain_clamp_below_min_returns_min ... ok
+test params::tests::halation_clamp_negative_returns_zero ... ok
+test io::image::tests::load_nonexistent_file_returns_file_not_found ... ok
+test params::tests::exposure_clamp_at_max_boundary ... ok
+test params::tests::exposure_clamp_at_min_boundary ... ok
+test io::image::tests::image_error_display_read_error ... ok
+test params::tests::exposure_clamp_below_min_returns_min ... ok
+test params::tests::clamp_midpoint_unchanged ... ok
 test params::tests::exposure_clamp_within_range_unchanged ... ok
+test params::tests::grain_clamp_above_max_returns_max ... ok
+test io::image::tests::load_invalid_file_returns_read_error ... ok
+test io::image::tests::load_valid_png_returns_base64_data_url ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
 
 
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.53s
-     Running unittests src\main.rs (target\debug\deps\nitrate-f07e580fdad7f541.exe)
+   Compiling nitrate v0.1.0 (C:\Users\SpencerNunamakerTrav\nitrate)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.79s
+     Running unittests src\main.rs (target\debug\deps\nitrate-491b2f13da0b8731.exe)
 
 
 >>> COMMAND: slopchop scan --locality
