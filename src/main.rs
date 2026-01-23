@@ -14,7 +14,7 @@ fn main() {
         .with_env_filter("nitrate=debug")
         .init();
 
-    info!("NITRATE — Volatile Memory");
+    info!("NITRATE - Volatile Memory");
 
     let config = Config::new()
         .with_window(
@@ -38,4 +38,4 @@ fn App() -> Element {
             ui::Viewport {}
         }
     }
-}
+}
