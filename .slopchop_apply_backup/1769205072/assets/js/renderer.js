@@ -1,12 +1,11 @@
-// NITRATE WebGL Renderer - Thin wrapper, Rust does heavy lifting
+// NITRATE WebGL Renderer
+// GPU-accelerated film simulation
 
 const Renderer = {
     gl: null,
     canvas: null,
     program: null,
     texture: null,
-    imgWidth: 0,
-    imgHeight: 0,
     uniforms: {
         exposure: 0.0,
         grain: 0.25,
@@ -45,6 +44,7 @@ const Renderer = {
             }
         `;
 
+        // Passthrough for now - filters come Phase 3
         const frag = `#version 300 es
             precision highp float;
             in vec2 vUV;
@@ -54,10 +54,15 @@ const Renderer = {
             uniform float uExposure;
             uniform float uGrain;
             uniform float uHalation;
+            uniform float uTime;
             
             void main() {
                 vec4 color = texture(uTexture, vUV);
+                
+                // Exposure (linear space)
                 color.rgb *= exp2(uExposure);
+                
+                // Clamp and output
                 fragColor = vec4(clamp(color.rgb, 0.0, 1.0), 1.0);
             }
         `;
@@ -101,40 +106,39 @@ const Renderer = {
         gl.vertexAttribPointer(aTexCoord, 2, gl.FLOAT, false, 16, 8);
     },
 
-    loadPixels(base64, width, height) {
-        const gl = this.gl;
-        this.imgWidth = width;
-        this.imgHeight = height;
+    loadImage(path) {
+        const img = new Image();
+        img.onload = () => {
+            this.uploadTexture(img);
+            this.resizeCanvas(img.width, img.height);
+            this.render();
+        };
+        img.onerror = () => console.error('[Renderer] Failed to load:', path);
+        img.src = path;
+    },
 
-        const binary = atob(base64);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-        }
+    uploadTexture(img) {
+        const gl = this.gl;
 
         if (this.texture) gl.deleteTexture(this.texture);
 
         this.texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, bytes);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-
-        this.resizeCanvas();
-        this.render();
-        console.log('[Renderer] Loaded', width, 'x', height);
     },
 
-    resizeCanvas() {
+    resizeCanvas(imgW, imgH) {
         const container = this.canvas.parentElement;
         const maxW = container.clientWidth;
         const maxH = container.clientHeight;
-        const scale = Math.min(maxW / this.imgWidth, maxH / this.imgHeight, 1);
+        const scale = Math.min(maxW / imgW, maxH / imgH, 1);
 
-        this.canvas.width = Math.floor(this.imgWidth * scale);
-        this.canvas.height = Math.floor(this.imgHeight * scale);
+        this.canvas.width = Math.floor(imgW * scale);
+        this.canvas.height = Math.floor(imgH * scale);
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     },
 
@@ -152,6 +156,7 @@ const Renderer = {
         gl.uniform1f(gl.getUniformLocation(this.program, 'uExposure'), this.uniforms.exposure);
         gl.uniform1f(gl.getUniformLocation(this.program, 'uGrain'), this.uniforms.grain);
         gl.uniform1f(gl.getUniformLocation(this.program, 'uHalation'), this.uniforms.halation);
+        gl.uniform1f(gl.getUniformLocation(this.program, 'uTime'), performance.now() / 1000);
 
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     }
