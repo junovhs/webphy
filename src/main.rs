@@ -8,6 +8,7 @@ use dioxus::prelude::*;
 use tracing::info;
 
 const MAIN_CSS: &str = include_str!("../assets/css/main.css");
+const RENDERER_JS: &str = include_str!("../assets/js/renderer.js");
 
 fn main() {
     tracing_subscriber::fmt()
@@ -35,6 +36,7 @@ fn App() -> Element {
 
     rsx! {
         style { {MAIN_CSS} }
+        script { {RENDERER_JS} }
         div { class: "app",
             ui::Sidebar { image_path }
             ui::Viewport { image_path }

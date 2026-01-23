@@ -31,11 +31,13 @@ fn main() {
 }
 
 fn App() -> Element {
+    let image_path: Signal<Option<String>> = use_signal(|| None);
+
     rsx! {
         style { {MAIN_CSS} }
         div { class: "app",
-            ui::Sidebar {}
-            ui::Viewport {}
+            ui::Sidebar { image_path }
+            ui::Viewport { image_path }
         }
     }
 }

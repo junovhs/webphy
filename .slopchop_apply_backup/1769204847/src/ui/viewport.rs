@@ -9,12 +9,14 @@ pub fn Viewport(image_path: Signal<Option<String>>) -> Element {
         if let Some(path) = image_path.read().as_ref() {
             let escaped = path.replace('\\', "/");
             let js = format!(
-                "setTimeout(() => {{
+                r#"
+                setTimeout(() => {{
                     if (!window.Renderer.gl) {{
                         window.Renderer.init('viewport-canvas');
                     }}
                     window.Renderer.loadImage('file:///{escaped}');
-                }}, 50);"
+                }}, 50);
+                "#
             );
             eval(&js);
         }
