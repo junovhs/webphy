@@ -1,32 +1,11 @@
-use crate::io;
-use crate::params::{self, ParamDef};
 use dioxus::prelude::*;
-use tracing::{error, info};
+use crate::params::{self, ParamDef};
 
 #[component]
-pub fn Sidebar(image_data: Signal<Option<String>>) -> Element {
+pub fn Sidebar() -> Element {
     let mut exposure = use_signal(|| params::EXPOSURE.default);
     let mut grain = use_signal(|| params::GRAIN.default);
     let mut halation = use_signal(|| params::HALATION.default);
-
-    let open_image = move |_| {
-        spawn(async move {
-            let file = rfd::AsyncFileDialog::new()
-                .add_filter("Images", &["png", "jpg", "jpeg"])
-                .pick_file()
-                .await;
-
-            if let Some(file) = file {
-                let path = file.path();
-                info!("Opening: {}", path.display());
-
-                match io::load_image_as_base64(path) {
-                    Ok(data) => image_data.set(Some(data)),
-                    Err(e) => error!("Failed to load image: {e}"),
-                }
-            }
-        });
-    };
 
     rsx! {
         aside { class: "sidebar",
@@ -57,11 +36,7 @@ pub fn Sidebar(image_data: Signal<Option<String>>) -> Element {
             }
 
             div { class: "sidebar-footer",
-                button {
-                    class: "btn btn-primary",
-                    onclick: open_image,
-                    "Open Image"
-                }
+                button { class: "btn btn-primary", "Open Image" }
                 button { class: "btn", "Export" }
             }
         }
