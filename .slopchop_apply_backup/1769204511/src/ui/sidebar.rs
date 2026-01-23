@@ -1,7 +1,6 @@
 use crate::params::{self, ParamDef};
-use dioxus::document::eval;
 use dioxus::prelude::*;
-use tracing::info;
+use tracing::{error, info};
 
 #[component]
 pub fn Sidebar(image_path: Signal<Option<String>>) -> Element {
@@ -88,6 +87,7 @@ fn ControlGroup(
                     if let Ok(v) = e.value().parse::<f32>() {
                         let clamped = param.clamp(v);
                         on_change.call(clamped);
+                        // Update WebGL uniform
                         let js = format!("window.Renderer && window.Renderer.setUniform('{uniform_name}', {clamped})");
                         eval(&js);
                     }
