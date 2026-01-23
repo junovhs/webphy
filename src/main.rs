@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+mod params;
 mod ui;
 
 use dioxus::desktop::{Config, WindowBuilder};
@@ -9,14 +10,12 @@ use tracing::info;
 const MAIN_CSS: &str = include_str!("../assets/css/main.css");
 
 fn main() {
-    // Initialize logging
     tracing_subscriber::fmt()
         .with_env_filter("nitrate=debug")
         .init();
 
     info!("NITRATE — Volatile Memory");
 
-    // Configure window
     let config = Config::new()
         .with_window(
             WindowBuilder::new()
@@ -26,7 +25,6 @@ fn main() {
         )
         .with_disable_context_menu(true);
 
-    // Launch app
     dioxus::LaunchBuilder::desktop()
         .with_cfg(config)
         .launch(App);

@@ -1,11 +1,11 @@
 use dioxus::prelude::*;
+use crate::params::{self, ParamDef};
 
 #[component]
 pub fn Sidebar() -> Element {
-    // Placeholder state - will be real signals in Phase 5
-    let mut exposure = use_signal(|| 0.0_f32);
-    let mut grain = use_signal(|| 0.25_f32);
-    let mut halation = use_signal(|| 0.15_f32);
+    let mut exposure = use_signal(|| params::EXPOSURE.default);
+    let mut grain = use_signal(|| params::GRAIN.default);
+    let mut halation = use_signal(|| params::HALATION.default);
 
     rsx! {
         aside { class: "sidebar",
@@ -17,26 +17,20 @@ pub fn Sidebar() -> Element {
             div { class: "controls",
                 ControlGroup {
                     label: "Exposure",
+                    param: params::EXPOSURE,
                     value: exposure(),
-                    min: -3.0,
-                    max: 3.0,
-                    step: 0.1,
                     on_change: move |v| exposure.set(v),
                 }
                 ControlGroup {
                     label: "Film Grain",
+                    param: params::GRAIN,
                     value: grain(),
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.01,
                     on_change: move |v| grain.set(v),
                 }
                 ControlGroup {
                     label: "Halation",
+                    param: params::HALATION,
                     value: halation(),
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.01,
                     on_change: move |v| halation.set(v),
                 }
             }
@@ -52,10 +46,8 @@ pub fn Sidebar() -> Element {
 #[component]
 fn ControlGroup(
     label: &'static str,
+    param: ParamDef,
     value: f32,
-    min: f32,
-    max: f32,
-    step: f32,
     on_change: EventHandler<f32>,
 ) -> Element {
     rsx! {
@@ -63,13 +55,13 @@ fn ControlGroup(
             label { "{label}" }
             input {
                 r#type: "range",
-                min: min,
-                max: max,
-                step: step,
+                min: param.min,
+                max: param.max,
+                step: param.step,
                 value: value,
                 oninput: move |e| {
                     if let Ok(v) = e.value().parse::<f32>() {
-                        on_change.call(v);
+                        on_change.call(param.clamp(v));
                     }
                 },
             }
