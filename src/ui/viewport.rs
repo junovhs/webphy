@@ -5,10 +5,9 @@ pub fn Viewport() -> Element {
     rsx! {
         main { class: "viewport",
             div { class: "canvas-container",
-                // Phase 2: This becomes a real canvas with WebGPU
                 div { class: "canvas-placeholder",
                     div { class: "placeholder-content",
-                        span { class: "icon", "◐" }
+                        span { class: "icon", "?" }
                         p { "Drop an image here" }
                         p { class: "hint", "or click Open Image" }
                     }
@@ -16,8 +15,8 @@ pub fn Viewport() -> Element {
             }
             div { class: "viewport-footer",
                 span { "Ready" }
-                span { "1280 × 800" }
+                span { "1280 x 800" }
             }
         }
     }
-}
+}

@@ -68,4 +68,4 @@ fn ControlGroup(
             span { class: "value", "{value:.2}" }
         }
     }
-}
+}
