@@ -1,9 +1,3 @@
 [application]
 name = "nitrate"
 default_platform = "desktop"
-
-[desktop]
-title = "NITRATE — Volatile Memory"
-width = 1280
-height = 800
-resizable = true

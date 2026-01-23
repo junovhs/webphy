@@ -1,4 +1,5 @@
-// Phase 5: Dioxus UI components
-// - Sidebar (parameter sliders)
-// - Viewport (canvas host)
-// - Presets
+mod sidebar;
+mod viewport;
+
+pub use sidebar::Sidebar;
+pub use viewport::Viewport;

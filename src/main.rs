@@ -1,25 +1,43 @@
 #![allow(non_snake_case)]
 
-mod engine;
+mod ui;
 
-use anyhow::Result;
-use engine::Engine;
+use dioxus::desktop::{Config, WindowBuilder};
+use dioxus::prelude::*;
 use tracing::info;
 
-fn main() -> Result<()> {
+const MAIN_CSS: &str = include_str!("../assets/css/main.css");
+
+fn main() {
     // Initialize logging
     tracing_subscriber::fmt()
-        .with_env_filter("nitrate=debug,wgpu=warn")
+        .with_env_filter("nitrate=debug")
         .init();
 
     info!("NITRATE — Volatile Memory");
-    info!("Initializing engine...");
 
-    // Run the engine (blocks until window closes)
-    pollster::block_on(run())
+    // Configure window
+    let config = Config::new()
+        .with_window(
+            WindowBuilder::new()
+                .with_title("NITRATE")
+                .with_inner_size(dioxus::desktop::LogicalSize::new(1280.0, 800.0))
+                .with_min_inner_size(dioxus::desktop::LogicalSize::new(900.0, 600.0)),
+        )
+        .with_disable_context_menu(true);
+
+    // Launch app
+    dioxus::LaunchBuilder::desktop()
+        .with_cfg(config)
+        .launch(App);
 }
 
-async fn run() -> Result<()> {
-    let engine = Engine::new().await?;
-    engine.run()
+fn App() -> Element {
+    rsx! {
+        style { {MAIN_CSS} }
+        div { class: "app",
+            ui::Sidebar {}
+            ui::Viewport {}
+        }
+    }
 }

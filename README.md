@@ -9,10 +9,15 @@ We don't just overlay filters. We simulate:
 - Light bouncing off the pressure plate (halation)
 - Proper colorimetric transforms in linear space
 
+## Stack
+
+- **UI**: Dioxus (Rust → HTML/CSS in webview)
+- **GPU**: WebGPU via wgpu (coming Phase 2)
+- **Platform**: Desktop-first, web demo later
+
 ## Prerequisites
 
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
-- GPU with Vulkan, Metal, or DX12 support
 
 ## Run
 
@@ -20,7 +25,7 @@ We don't just overlay filters. We simulate:
 cargo run
 ```
 
-For release build (optimized):
+Release build:
 ```bash
 cargo run --release
 ```
@@ -29,27 +34,23 @@ cargo run --release
 
 ```
 src/
-├── main.rs          # Entry point
-├── engine/          # WGPU rendering core
-│   ├── mod.rs       # Window + event loop
-│   ├── context.rs   # GPU device, queue, surface
-│   └── render.rs    # Frame drawing
-├── passes/          # Filter pipeline stages (Phase 3-4)
-├── shaders/         # WGSL shader sources (Phase 3)
-└── ui/              # Dioxus interface (Phase 5)
+├── main.rs         # Entry, Dioxus launch + config
+└── ui/
+    ├── mod.rs      # UI module exports
+    ├── sidebar.rs  # Controls panel
+    └── viewport.rs # Image canvas area
+
+assets/
+└── css/
+    └── main.css    # Dark film aesthetic
 ```
 
 ## Development Phases
 
-- [x] Phase 1: Proof of Lifes (window + WGPU clear)
-- [ ] Phase 2: Engine Core (texture loading, passthrough)
+- [x] Phase 1: Proof of Life (Dioxus shell + layout)
+- [ ] Phase 2: Engine Core (WebGPU canvas, texture loading)
 - [ ] Phase 3: Shader Laboratory (WGSL ports)
 - [ ] Phase 4: Filter Chain (full pipeline)
-- [ ] Phase 5: UI Integration (Dioxus controls)
+- [ ] Phase 5: UI Integration (signals → uniforms)
 - [ ] Phase 6: File I/O (import/export)
 - [ ] Phase 7: Polish
-- [ ] Phase 8: Web Demo (optional)
-
-## License
-
-Proprietary. All rights reserved.

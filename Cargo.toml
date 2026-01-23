@@ -3,32 +3,25 @@ name = "nitrate"
 version = "0.1.0"
 edition = "2021"
 description = "Physics-based film simulation engine"
-authors = ["Your Name"]
 
 [dependencies]
-# UI Framework (Desktop-first)
+# UI Framework
 dioxus = { version = "0.6", features = ["desktop"] }
 
-# Graphics Engine
-wgpu = "24.0"
-bytemuck = { version = "1.14", features = ["derive"] }
-glam = "0.29"
-
-# Windowing (WGPU surface integration)
-raw-window-handle = "0.6"
-
-# Image Processing
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-
-# Utilities
-anyhow = "1.0"
-thiserror = "2.0"
+# Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Async
-pollster = "0.4"
+# Utilities
+anyhow = "1.0"
+
+# Phase 2+ (uncomment when needed)
+# wgpu = "24.0"
+# bytemuck = { version = "1.14", features = ["derive"] }
+# glam = "0.29"
+# image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 
 [profile.release]
 lto = true
 codegen-units = 1
+opt-level = "z"

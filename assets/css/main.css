@@ -1,0 +1,210 @@
+/* NITRATE — Volatile Memory */
+/* Dark film photography aesthetic */
+
+:root {
+    --bg-dark: #0a0a0a;
+    --bg-panel: #141414;
+    --bg-hover: #1a1a1a;
+    --border: #2a2a2a;
+    --text: #e8e8e8;
+    --text-dim: #888;
+    --accent: #e07030;
+    --accent-dim: #a05020;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 13px;
+    background: var(--bg-dark);
+    color: var(--text);
+    overflow: hidden;
+    user-select: none;
+}
+
+.app {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header h1 {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+}
+
+.sidebar-header .tagline {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.controls {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.control-group {
+    margin-bottom: 20px;
+}
+
+.control-group label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+}
+
+.control-group input[type="range"] {
+    width: 100%;
+    height: 4px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+.control-group .value {
+    display: block;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    font-family: "SF Mono", Monaco, monospace;
+}
+
+.sidebar-footer {
+    padding: 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.btn {
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-hover);
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.btn:hover {
+    background: var(--border);
+}
+
+.btn-primary {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--accent);
+}
+
+/* Viewport */
+.viewport {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-dark);
+}
+
+.canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.canvas-placeholder {
+    width: 100%;
+    height: 100%;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0d0d0d 0%, #111 100%);
+}
+
+.placeholder-content {
+    text-align: center;
+    color: var(--text-dim);
+}
+
+.placeholder-content .icon {
+    font-size: 48px;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 16px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+}
+
+.placeholder-content p {
+    margin: 4px 0;
+}
+
+.placeholder-content .hint {
+    font-size: 11px;
+}
+
+.viewport-footer {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-dim);
+}
