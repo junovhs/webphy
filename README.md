@@ -41,7 +41,7 @@ src/
 
 ## Development Phases
 
-- [x] Phase 1: Proof of Life (window + WGPU clear)
+- [x] Phase 1: Proof of Lifes (window + WGPU clear)
 - [ ] Phase 2: Engine Core (texture loading, passthrough)
 - [ ] Phase 3: Shader Laboratory (WGSL ports)
 - [ ] Phase 4: Filter Chain (full pipeline)
