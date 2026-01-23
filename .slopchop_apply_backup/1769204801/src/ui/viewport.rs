@@ -1,17 +1,29 @@
+use dioxus::document::eval;
 use dioxus::prelude::*;
 
 #[component]
-pub fn Viewport(image_data: Signal<Option<String>>) -> Element {
-    let has_image = image_data.read().is_some();
+pub fn Viewport(image_path: Signal<Option<String>>) -> Element {
+    let has_image = image_path.read().is_some();
+
+    use_effect(move || {
+        eval("window.Renderer && window.Renderer.init('viewport-canvas')");
+    });
+
+    use_effect(move || {
+        if let Some(path) = image_path.read().as_ref() {
+            let escaped = path.replace('\\', "\\\\").replace('\'', "\\'");
+            let js = format!("window.Renderer && window.Renderer.loadImage('file:///{escaped}')");
+            eval(&js);
+        }
+    });
 
     rsx! {
         main { class: "viewport",
             div { class: "canvas-container",
                 if has_image {
-                    img {
-                        class: "preview-image",
-                        src: image_data.read().as_ref().unwrap(),
-                        alt: "Preview"
+                    canvas {
+                        id: "viewport-canvas",
+                        class: "render-canvas"
                     }
                 } else {
                     div { class: "canvas-placeholder",
