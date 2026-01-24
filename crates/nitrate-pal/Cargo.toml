@@ -1,0 +1,24 @@
+[package]
+name = "nitrate-pal"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nitrate-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+arrayvec.workspace = true
+bitflags.workspace = true
+raw-window-handle.workspace = true
+
+# Vulkan (Linux primary, Windows secondary)
+ash.workspace = true
+ash-window.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific: DRM, VA-API bindings would go here
+# For now we use ash directly
+
+[features]
+default = ["vulkan"]
+vulkan = []

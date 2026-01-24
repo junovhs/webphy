@@ -1,0 +1,12 @@
+[package]
+name = "nitrate-compositor"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nitrate-core.workspace = true
+nitrate-pal.workspace = true
+nitrate-color.workspace = true
+wgpu.workspace = true
+bytemuck.workspace = true
+tracing.workspace = true

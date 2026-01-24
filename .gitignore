@@ -1,5 +1,8 @@
-target/
-dist/
-**/*.rs.bk
+/target
+Cargo.lock
+*.swp
+*.swo
 .DS_Store
-.env
+*.log
+.slopchop
+.slopchop_apply_backup

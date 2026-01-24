@@ -1,56 +1,74 @@
 # NITRATE — Volatile Memory
 
-Physics-based film simulation engine.
+Physics-based film simulation engine with native GPU rendering.
 
-## Philosophy
+## Architecture
 
-We don't just overlay filters. We simulate:
-- Random distribution of silver halide crystals in emulsion
-- Light bouncing off the pressure plate (halation)
-- Proper colorimetric transforms in linear space
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    NATIVE LAYER (owns resources)            │
+│  • Video decoder surfaces (VA-API / MF / VideoToolbox)      │
+│  • UI render target (exportable to wgpu)                    │
+│  • Timeline semaphores for GPU-GPU sync                     │
+└─────────────────────────────────────────────────────────────┘
+                             │
+                   Import handles + sync
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    WGPU LAYER (borrows)                     │
+│  • Vello renders UI to imported render target               │
+│  • Composition shader samples video + UI                    │
+└─────────────────────────────────────────────────────────────┘
+```
 
-## Stack
+## Crates
 
-- **UI**: Dioxus (Rust → HTML/CSS in webview)
-- **GPU**: WebGPU via wgpu (coming Phase 2)
-- **Platform**: Desktop-first, web demo later
+| Crate | Purpose |
+|-------|---------|
+| `nitrate-core` | Shared types, error handling |
+| `nitrate-pal` | Platform abstraction (Vulkan/D3D12/Metal) |
+| `nitrate-color` | Color space transforms, tone mapping |
+| `nitrate-decode` | Hardware video decoding |
+| `nitrate-ui` | Vello-based UI rendering |
+| `nitrate-compositor` | Video + UI composition |
+| `nitrate-app` | Application framework |
 
-## Prerequisites
+## Sync Tiers
 
-- [Rust](https://www.rust-lang.org/tools/install) (stable)
+Not all platforms support the same level of GPU-GPU synchronization:
 
-## Run
+- **Tier A**: Timeline semaphores (Vulkan 1.2, D3D12 fences, Metal shared events)
+- **Tier B**: Binary sync with explicit sync_file import  
+- **Tier C**: CPU coordination (fallback)
+
+## Building
 
 ```bash
-cargo run
+cargo build --release
 ```
 
-Release build:
+## Running
+
 ```bash
-cargo run --release
+cargo run -p nitrate-app
 ```
 
-## Project Structure
+## Reference
 
-```
-src/
-├── main.rs         # Entry, Dioxus launch + config
-└── ui/
-    ├── mod.rs      # UI module exports
-    ├── sidebar.rs  # Controls panel
-    └── viewport.rs # Image canvas area
+The `reference/` directory contains the UI design to be recreated in Vello:
+- `ui-design.css` - Original CSS from Dioxus mockup
 
-assets/
-└── css/
-    └── main.css    # Dark film aesthetic
-```
+## Performance Targets
 
-## Development Phases
+- 4K 24fps playback minimum
+- 8K with buffering acceptable
+- Zero-copy decode → render pipeline
+- Linear-space HDR compositing
 
-- [x] Phase 1: Proof of Life (Dioxus shell + layout)
-- [ ] Phase 2: Engine Core (WebGPU canvas, texture loading)
-- [ ] Phase 3: Shader Laboratory (WGSL ports)
-- [ ] Phase 4: Filter Chain (full pipeline)
-- [ ] Phase 5: UI Integration (signals → uniforms)
-- [ ] Phase 6: File I/O (import/export)
-- [ ] Phase 7: Polish
+## Platforms
+
+| Platform | Decode | Sync | Status |
+|----------|--------|------|--------|
+| Linux | VA-API | Timeline Semaphores | In Progress |
+| Windows | Media Foundation | D3D12 Fences | Planned |
+| macOS | VideoToolbox | MTLSharedEvent | Planned |

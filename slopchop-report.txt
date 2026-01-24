@@ -1,52 +1,131 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-23 13:52:08
-Status: PASSED
+Generated: 2026-01-23 19:25:23
+Status: FAILED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
-  5    src\ui\sidebar.rs
-  3    src\io\mod.rs
-  1    src\ui\viewport.rs
-  0    assets\css\main.css
-  0    assets\js\renderer.js
+  6    crates/nitrate-pal/src/vulkan/helpers.rs
+  6    crates/nitrate-app/src/app.rs
+  4    crates/nitrate-core/src/lib.rs
+  4    crates/nitrate-pal/src/sync.rs
+  2    crates/nitrate-app/src/gpu.rs
 
 Top 5 Largest Files (Tokens):
-  1191  assets\js\renderer.js
-  1125  assets\css\main.css
-  699   src\params.rs
-  673   src\ui\sidebar.rs
-  543   src\io\mod.rs
+  1509  architecture-deep-dive.md
+  1413  crates/nitrate-pal/src/sync.rs
+  1363  crates/nitrate-pal/src/vulkan/helpers.rs
+  1292  crates/nitrate-color/src/lib.rs
+  1235  crates/nitrate-pal/src/surface.rs
 
 === VIOLATIONS ===
-None. Codebase is clean.
+[SlopChop Internal Rules]
+crates/nitrate-pal/src/vulkan/device.rs:27 | LCOM4 | Class 'VulkanDevice' has low cohesion (LCOM4: 2)
+crates/nitrate-pal/src/sync.rs:123 | LCOM4 | Class 'CpuSync' has low cohesion (LCOM4: 2)
+crates/nitrate-app/src/gpu.rs:59 | CBO | Class 'GpuBuilder' is tightly coupled (CBO: 23)
+crates/nitrate-app/src/gpu.rs:59 | SFOUT | Class 'GpuBuilder' has high fan-out (SFOUT: 13)
+
+[External Tools]
 
 === FULL OUTPUT LOGS ===
 
->>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.53s
+>>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate
+    Checking nitrate-compositor v0.1.0 (/home/juno/nitrate/crates/nitrate-compositor)
+    Checking nitrate-ui v0.1.0 (/home/juno/nitrate/crates/nitrate-ui)
+    Checking nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 0.35s
 
 
 >>> COMMAND: cargo test
 
-running 12 tests
-test params::tests::clamp_midpoint_unchanged ... ok
-test io::tests::image_error_display ... ok
-test params::tests::exposure_clamp_above_max_returns_max ... ok
-test params::tests::exposure_clamp_at_min_boundary ... ok
-test params::tests::exposure_clamp_below_min_returns_min ... ok
-test params::tests::exposure_clamp_within_range_unchanged ... ok
-test params::tests::grain_clamp_above_max_returns_max ... ok
-test io::tests::load_nonexistent_returns_error ... ok
-test params::tests::halation_clamp_negative_returns_zero ... ok
-test params::tests::exposure_clamp_at_max_boundary ... ok
-test params::tests::grain_clamp_below_min_returns_min ... ok
-test io::tests::load_valid_image_returns_rgba_data ... ok
+running 0 tests
 
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.47s
-     Running unittests src\main.rs (target\debug\deps\nitrate-491b2f13da0b8731.exe)
+running 2 tests
+test tests::yuv_matrix_size ... ok
+test tests::color_uniforms_size ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test tests::extent_pixel_count ... ok
+test tests::frame_id_increment ... ok
+test tests::frame_id_validity ... ok
+test tests::pixel_format_plane_counts ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 3 tests
+test sync::tests::cpu_sync_works ... ok
+test sync::tests::sync_tier_ordering ... ok
+test sync::tests::timeline_values_monotonic ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+   Compiling nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.34s
+     Running unittests src/main.rs (target/debug/deps/nitrate-fda8da7275d52c60)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_color-931f666b067e1494)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_compositor-bb8198eb93dbe1ef)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_core-0f5a5b9e5dd5b82d)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_decode-c622b0f99c9b9496)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_pal-1e399aaa3b6420ec)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_ui-b1480abafc6d2390)
+   Doc-tests nitrate_color
+   Doc-tests nitrate_compositor
+   Doc-tests nitrate_core
+   Doc-tests nitrate_decode
+   Doc-tests nitrate_pal
+   Doc-tests nitrate_ui
 
 
 >>> COMMAND: slopchop scan --locality

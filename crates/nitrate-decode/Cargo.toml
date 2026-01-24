@@ -1,0 +1,13 @@
+[package]
+name = "nitrate-decode"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nitrate-core.workspace = true
+nitrate-pal.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# VA-API bindings would go here

@@ -1,0 +1,11 @@
+[package]
+name = "nitrate-ui"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nitrate-core.workspace = true
+nitrate-pal.workspace = true
+wgpu.workspace = true
+vello.workspace = true
+tracing.workspace = true

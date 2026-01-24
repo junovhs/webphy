@@ -1,19 +1,65 @@
-[package]
-name = "nitrate"
+[workspace]
+resolver = "2"
+members = [
+    "crates/nitrate-core",
+    "crates/nitrate-pal",
+    "crates/nitrate-color",
+    "crates/nitrate-decode",
+    "crates/nitrate-ui",
+    "crates/nitrate-compositor",
+    "crates/nitrate-app",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-description = "Physics-based film simulation engine"
+license = "MIT"
+repository = "https://github.com/junovhs/nitrate"
 
-[dependencies]
-dioxus = { version = "0.6", features = ["desktop"] }
+[workspace.dependencies]
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-anyhow = "1.0"
-rfd = "0.15"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
-base64 = "0.22"
+
+# Async
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "macros"] }
+
+# Graphics - Core
+wgpu = { version = "24.0", features = ["vulkan-portability"] }
+winit = "0.30"
+raw-window-handle = "0.6"
+
+# Graphics - UI
+vello = "0.4"
+
+# Graphics - Native (Linux)
+ash = "0.38"
+ash-window = "0.13"
+
+# Collections
+arrayvec = "0.7"
+smallvec = "1.13"
+
+# Data
+bytemuck = { version = "1.14", features = ["derive"] }
+bitflags = "2.4"
+
+# Internal crates
+nitrate-core = { path = "crates/nitrate-core" }
+nitrate-pal = { path = "crates/nitrate-pal" }
+nitrate-color = { path = "crates/nitrate-color" }
+nitrate-decode = { path = "crates/nitrate-decode" }
+nitrate-ui = { path = "crates/nitrate-ui" }
+nitrate-compositor = { path = "crates/nitrate-compositor" }
 
 [profile.release]
 lto = true
 codegen-units = 1
-opt-level = "z"
+opt-level = 3
+
+[profile.dev]
+opt-level = 1

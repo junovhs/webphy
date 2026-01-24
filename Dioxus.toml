@@ -1,6 +1,0 @@
-[application]
-name = "nitrate"
-default_platform = "desktop"
-
-[web.resource]
-script = ["assets/js/renderer.js"]

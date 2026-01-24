@@ -1,0 +1,8 @@
+[package]
+name = "nitrate-color"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+nitrate-core.workspace = true
+bytemuck.workspace = true

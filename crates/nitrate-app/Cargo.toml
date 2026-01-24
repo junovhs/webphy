@@ -1,0 +1,22 @@
+[package]
+name = "nitrate-app"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "nitrate"
+path = "src/main.rs"
+
+[dependencies]
+nitrate-core.workspace = true
+nitrate-pal.workspace = true
+nitrate-color.workspace = true
+nitrate-ui.workspace = true
+nitrate-compositor.workspace = true
+
+winit.workspace = true
+wgpu.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+pollster = "0.4"
