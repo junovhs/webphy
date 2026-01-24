@@ -1,5 +1,5 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-23 19:25:23
+Generated: 2026-01-24 01:16:05
 Status: FAILED
 
 === DASHBOARD ===
@@ -11,28 +11,27 @@ Top 5 Cognitive Complexity:
   2    crates/nitrate-app/src/gpu.rs
 
 Top 5 Largest Files (Tokens):
-  1509  architecture-deep-dive.md
-  1413  crates/nitrate-pal/src/sync.rs
-  1363  crates/nitrate-pal/src/vulkan/helpers.rs
-  1292  crates/nitrate-color/src/lib.rs
-  1235  crates/nitrate-pal/src/surface.rs
+  4355  docs/roadmap.md
+  1518  docs/architecture-deep-dive.md
+  1372  crates/nitrate-pal/src/vulkan/helpers.rs
+  1294  crates/nitrate-color/src/lib.rs
+  1250  crates/nitrate-pal/src/surface.rs
 
 === VIOLATIONS ===
 [SlopChop Internal Rules]
-crates/nitrate-pal/src/vulkan/device.rs:27 | LCOM4 | Class 'VulkanDevice' has low cohesion (LCOM4: 2)
-crates/nitrate-pal/src/sync.rs:123 | LCOM4 | Class 'CpuSync' has low cohesion (LCOM4: 2)
-crates/nitrate-app/src/gpu.rs:59 | CBO | Class 'GpuBuilder' is tightly coupled (CBO: 23)
-crates/nitrate-app/src/gpu.rs:59 | SFOUT | Class 'GpuBuilder' has high fan-out (SFOUT: 13)
+crates/nitrate-pal/src/sync.rs:86 | LCOM4 | Class 'CpuSync' has low cohesion (LCOM4: 2)
 
 [External Tools]
 
 === FULL OUTPUT LOGS ===
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate
-    Checking nitrate-compositor v0.1.0 (/home/juno/nitrate/crates/nitrate-compositor)
+    Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
     Checking nitrate-ui v0.1.0 (/home/juno/nitrate/crates/nitrate-ui)
+    Checking nitrate-compositor v0.1.0 (/home/juno/nitrate/crates/nitrate-compositor)
+    Checking nitrate-decode v0.1.0 (/home/juno/nitrate/crates/nitrate-decode)
     Checking nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
-    Finished `dev` profile [optimized + debuginfo] target(s) in 0.35s
+    Finished `dev` profile [optimized + debuginfo] target(s) in 0.55s
 
 
 >>> COMMAND: cargo test
@@ -43,8 +42,8 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
 
 running 2 tests
-test tests::yuv_matrix_size ... ok
 test tests::color_uniforms_size ... ok
+test tests::yuv_matrix_size ... ok
 
 test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -111,15 +110,19 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
+   Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
+   Compiling nitrate-ui v0.1.0 (/home/juno/nitrate/crates/nitrate-ui)
+   Compiling nitrate-compositor v0.1.0 (/home/juno/nitrate/crates/nitrate-compositor)
+   Compiling nitrate-decode v0.1.0 (/home/juno/nitrate/crates/nitrate-decode)
    Compiling nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
-    Finished `test` profile [optimized + debuginfo] target(s) in 0.34s
-     Running unittests src/main.rs (target/debug/deps/nitrate-fda8da7275d52c60)
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.55s
+     Running unittests src/main.rs (target/debug/deps/nitrate-137fb85b4453cc16)
      Running unittests src/lib.rs (target/debug/deps/nitrate_color-931f666b067e1494)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_compositor-bb8198eb93dbe1ef)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_compositor-63d096c93065b80f)
      Running unittests src/lib.rs (target/debug/deps/nitrate_core-0f5a5b9e5dd5b82d)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_decode-c622b0f99c9b9496)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_pal-1e399aaa3b6420ec)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_ui-b1480abafc6d2390)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_decode-63aa81cbf0f244ef)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_pal-d4572f3af7eaf482)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_ui-000abc01f46c9423)
    Doc-tests nitrate_color
    Doc-tests nitrate_compositor
    Doc-tests nitrate_core

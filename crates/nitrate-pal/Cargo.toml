@@ -10,6 +10,7 @@ tracing.workspace = true
 arrayvec.workspace = true
 bitflags.workspace = true
 raw-window-handle.workspace = true
+wgpu.workspace = true
 
 # Vulkan (Linux primary, Windows secondary)
 ash.workspace = true

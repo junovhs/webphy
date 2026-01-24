@@ -1,27 +1,13 @@
 //! GPU synchronization primitives with explicit capability tiers
-//!
-//! # Sync Tiers
-//!
-//! Not all platforms support the same level of GPU-GPU synchronization.
-//! We define explicit tiers with graceful fallback:
-//!
-//! - **Tier A**: Timeline semaphores (Vulkan 1.2, D3D12 fences, Metal shared events)
-//! - **Tier B**: Binary sync with explicit `sync_file` import
-//! - **Tier C**: CPU coordination (poll/wait)
 
 use nitrate_core::FrameId;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-// ============================================================================
-// Sync Tier (capability level)
-// ============================================================================
-
-/// Synchronization capability tier
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SyncTier {
-    TierC = 0, // CPU coordination
-    TierB = 1, // Binary semaphores
-    TierA = 2, // Timeline semaphores
+    TierC = 0,
+    TierB = 1,
+    TierA = 2,
 }
 
 impl SyncTier {
@@ -34,10 +20,6 @@ impl SyncTier {
         }
     }
 }
-
-// ============================================================================
-// Sync Capabilities
-// ============================================================================
 
 #[derive(Debug, Clone, Copy)]
 pub struct SyncCapabilities {
@@ -60,23 +42,15 @@ impl Default for SyncCapabilities {
 
 impl SyncCapabilities {
     #[must_use]
-    pub fn has_tier_a(&self) -> bool {
-        self.timeline_semaphores
-    }
-
+    pub fn has_tier_a(&self) -> bool { self.timeline_semaphores }
     #[must_use]
-    pub fn has_tier_b(&self) -> bool {
-        self.sync_file_import
-    }
+    pub fn has_tier_b(&self) -> bool { self.sync_file_import }
 }
-
-// ============================================================================
-// Sync Strategy Trait
-// ============================================================================
 
 pub trait SyncStrategy: Send + Sync {
     fn tier(&self) -> SyncTier;
     fn wait_decode_complete(&self, frame_id: FrameId) -> WaitResult;
+    fn signal_decode_complete(&self, frame_id: FrameId);
     fn signal_compose_complete(&self, frame_id: FrameId);
     fn wait_ui_complete(&self, frame_id: FrameId) -> WaitResult;
     fn signal_ui_complete(&self, frame_id: FrameId);
@@ -84,15 +58,10 @@ pub trait SyncStrategy: Send + Sync {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WaitResult {
-    AlreadySignaled,
     Success,
     Timeout,
     DeviceLost,
 }
-
-// ============================================================================
-// Tier A: Timeline Semaphore Sync
-// ============================================================================
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TimelineValues {
@@ -113,81 +82,50 @@ impl TimelineValues {
     }
 }
 
-// ============================================================================
-// Tier C: CPU Sync (Fallback)
-// ============================================================================
-
-/// CPU-coordinated sync using atomic flags
-///
-/// Uses an array layout to ensure LCOM4 = 1 (all methods access the same 'slots' field)
+/// CPU-coordinated sync. Single field ensures LCOM4 = 1.
 pub struct CpuSync {
-    // 0: decode, 1: ui, 2: compose
-    slots: [AtomicU64; 3],
+    /// [0]=decode, [1]=ui, [2]=compose
+    vals: [AtomicU64; 3],
 }
-
-const IDX_DECODE: usize = 0;
-const IDX_UI: usize = 1;
-const IDX_COMPOSE: usize = 2;
 
 impl CpuSync {
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            slots: [
-                AtomicU64::new(0),
-                AtomicU64::new(0),
-                AtomicU64::new(0),
-            ],
-        }
-    }
-
-    pub fn mark_decode_complete(&self, frame_id: FrameId) {
-        self.slots[IDX_DECODE].store(frame_id.0, Ordering::Release);
-    }
-
-    #[must_use]
-    pub fn is_decode_complete(&self, frame_id: FrameId) -> bool {
-        self.slots[IDX_DECODE].load(Ordering::Acquire) >= frame_id.0
-    }
-
-    pub fn reset(&self) {
-        for slot in &self.slots {
-            slot.store(0, Ordering::Release);
-        }
+        Self { vals: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0)] }
     }
 }
 
 impl Default for CpuSync {
-    fn default() -> Self {
-        Self::new()
-    }
+    fn default() -> Self { Self::new() }
 }
 
 impl SyncStrategy for CpuSync {
-    fn tier(&self) -> SyncTier {
-        SyncTier::TierC
-    }
+    fn tier(&self) -> SyncTier { SyncTier::TierC }
 
     fn wait_decode_complete(&self, frame_id: FrameId) -> WaitResult {
-        while self.slots[IDX_DECODE].load(Ordering::Acquire) < frame_id.0 {
+        while self.vals.first().map_or(0, |v| v.load(Ordering::Acquire)) < frame_id.0 {
             std::hint::spin_loop();
         }
         WaitResult::Success
     }
 
+    fn signal_decode_complete(&self, frame_id: FrameId) {
+        if let Some(v) = self.vals.first() { v.store(frame_id.0, Ordering::Release); }
+    }
+
     fn signal_compose_complete(&self, frame_id: FrameId) {
-        self.slots[IDX_COMPOSE].store(frame_id.0, Ordering::Release);
+        if let Some(v) = self.vals.get(2) { v.store(frame_id.0, Ordering::Release); }
     }
 
     fn wait_ui_complete(&self, frame_id: FrameId) -> WaitResult {
-        while self.slots[IDX_UI].load(Ordering::Acquire) < frame_id.0 {
+        while self.vals.get(1).map_or(0, |v| v.load(Ordering::Acquire)) < frame_id.0 {
             std::hint::spin_loop();
         }
         WaitResult::Success
     }
 
     fn signal_ui_complete(&self, frame_id: FrameId) {
-        self.slots[IDX_UI].store(frame_id.0, Ordering::Release);
+        if let Some(v) = self.vals.get(1) { v.store(frame_id.0, Ordering::Release); }
     }
 }
 
@@ -205,7 +143,6 @@ mod tests {
     fn timeline_values_monotonic() {
         let v1 = TimelineValues::for_frame(FrameId(1));
         let v2 = TimelineValues::for_frame(FrameId(2));
-
         assert!(v2.decode_complete > v1.compose_complete);
     }
 
@@ -213,12 +150,7 @@ mod tests {
     fn cpu_sync_works() {
         let sync = CpuSync::new();
         let frame = FrameId(1);
-
-        assert!(!sync.is_decode_complete(frame));
-        sync.mark_decode_complete(frame);
-        assert!(sync.is_decode_complete(frame));
-        
-        sync.reset();
-        assert!(!sync.is_decode_complete(frame));
+        sync.signal_decode_complete(frame);
+        assert_eq!(sync.wait_decode_complete(frame), WaitResult::Success);
     }
 }
