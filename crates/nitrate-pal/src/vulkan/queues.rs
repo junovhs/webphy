@@ -14,12 +14,12 @@ pub struct QueueFamilies {
 
 impl QueueFamilies {
     /// Returns true if graphics and present are the same family.
-    pub const fn is_unified(&self) -> bool {
+    pub const fn is_unified(self) -> bool {
         self.graphics == self.present
     }
 
     /// Returns unique family indices.
-    pub fn unique_indices(&self) -> Vec<u32> {
+    pub fn unique_indices(self) -> Vec<u32> {
         if self.is_unified() {
             vec![self.graphics]
         } else {
@@ -42,6 +42,8 @@ pub fn find_queue_families(
     let mut present = None;
 
     for (idx, family) in props.iter().enumerate() {
+        // Queue family indices are always small (< 32 typically), safe to truncate
+        #[allow(clippy::cast_possible_truncation)]
         let idx = idx as u32;
 
         if family.queue_flags.contains(vk::QueueFlags::GRAPHICS) && graphics.is_none() {
@@ -50,7 +52,9 @@ pub fn find_queue_families(
 
         // SAFETY: surface_loader, physical_device, and surface are valid
         let supports_present = unsafe {
-            surface_loader.get_physical_device_surface_support(physical_device, idx, surface).unwrap_or(false)
+            surface_loader
+                .get_physical_device_surface_support(physical_device, idx, surface)
+                .unwrap_or(false)
         };
 
         if supports_present && present.is_none() {
@@ -65,7 +69,10 @@ pub fn find_queue_families(
     match (graphics, present) {
         (Some(g), Some(p)) => {
             debug!("Queue families: graphics={}, present={}", g, p);
-            Some(QueueFamilies { graphics: g, present: p })
+            Some(QueueFamilies {
+                graphics: g,
+                present: p,
+            })
         }
         _ => None,
     }

@@ -38,26 +38,46 @@ impl VulkanDevice {
     /// Creates device on best available physical device.
     pub fn new(instance: &VulkanInstance, surface: vk::SurfaceKHR) -> PalResult<Self> {
         let physical = select_physical_device(instance, surface)?;
-        let families = find_queue_families(instance.raw(), physical, instance.surface_loader(), surface)
-            .ok_or(VulkanError::DeviceCreation("No suitable queues".into()))?;
+        let families =
+            find_queue_families(instance.raw(), physical, instance.surface_loader(), surface)
+                .ok_or(VulkanError::DeviceCreation("No suitable queues".into()))?;
 
         let (device, enabled_exts) = create_logical_device(instance.raw(), physical, &families)?;
         let capabilities = detect_capabilities(&enabled_exts);
 
         info!("Sync tier: {:?}", capabilities.sync_tier);
 
-        let queues = extract_queues(&device, &families);
+        let queues = extract_queues(&device, families);
         let swapchain_loader = khr::swapchain::Device::new(instance.raw(), &device);
 
-        Ok(Self { physical, device, queues, families, capabilities, swapchain_loader })
+        Ok(Self {
+            physical,
+            device,
+            queues,
+            families,
+            capabilities,
+            swapchain_loader,
+        })
     }
 
-    pub fn raw(&self) -> &ash::Device { &self.device }
-    pub fn physical(&self) -> vk::PhysicalDevice { self.physical }
-    pub fn queues(&self) -> &DeviceQueues { &self.queues }
-    pub fn families(&self) -> &QueueFamilies { &self.families }
-    pub fn capabilities(&self) -> &DeviceCapabilities { &self.capabilities }
-    pub fn swapchain_loader(&self) -> &khr::swapchain::Device { &self.swapchain_loader }
+    pub fn raw(&self) -> &ash::Device {
+        &self.device
+    }
+    pub fn physical(&self) -> vk::PhysicalDevice {
+        self.physical
+    }
+    pub fn queues(&self) -> &DeviceQueues {
+        &self.queues
+    }
+    pub fn families(&self) -> &QueueFamilies {
+        &self.families
+    }
+    pub fn capabilities(&self) -> &DeviceCapabilities {
+        &self.capabilities
+    }
+    pub fn swapchain_loader(&self) -> &khr::swapchain::Device {
+        &self.swapchain_loader
+    }
 }
 
 impl Drop for VulkanDevice {
@@ -71,21 +91,37 @@ impl Drop for VulkanDevice {
     }
 }
 
-fn select_physical_device(instance: &VulkanInstance, surface: vk::SurfaceKHR) -> PalResult<vk::PhysicalDevice> {
+fn select_physical_device(
+    instance: &VulkanInstance,
+    surface: vk::SurfaceKHR,
+) -> PalResult<vk::PhysicalDevice> {
     // SAFETY: instance is valid
-    let devices = unsafe { instance.raw().enumerate_physical_devices() }.map_err(VulkanError::Api)?;
+    let devices =
+        unsafe { instance.raw().enumerate_physical_devices() }.map_err(VulkanError::Api)?;
 
-    devices.into_iter()
+    devices
+        .into_iter()
         .find(|&pd| is_device_suitable(instance, pd, surface))
         .ok_or_else(|| VulkanError::DeviceCreation("No suitable GPU".into()).into())
 }
 
-fn is_device_suitable(instance: &VulkanInstance, physical: vk::PhysicalDevice, surface: vk::SurfaceKHR) -> bool {
-    let has_queues = find_queue_families(instance.raw(), physical, instance.surface_loader(), surface).is_some();
+fn is_device_suitable(
+    instance: &VulkanInstance,
+    physical: vk::PhysicalDevice,
+    surface: vk::SurfaceKHR,
+) -> bool {
+    let has_queues =
+        find_queue_families(instance.raw(), physical, instance.surface_loader(), surface).is_some();
 
     // SAFETY: instance and physical device are valid
-    let extensions = unsafe { instance.raw().enumerate_device_extension_properties(physical) }.unwrap_or_default();
-    let has_extensions = extensions::check_required(&extensions, REQUIRED_DEVICE_EXTENSIONS).is_ok();
+    let extensions = unsafe {
+        instance
+            .raw()
+            .enumerate_device_extension_properties(physical)
+    }
+    .unwrap_or_default();
+    let has_extensions =
+        extensions::check_required(&extensions, REQUIRED_DEVICE_EXTENSIONS).is_ok();
 
     has_queues && has_extensions
 }
@@ -96,13 +132,21 @@ fn create_logical_device(
     families: &QueueFamilies,
 ) -> PalResult<(ash::Device, Vec<&'static CStr>)> {
     // SAFETY: instance and physical are valid
-    let available = unsafe { instance.enumerate_device_extension_properties(physical) }.map_err(VulkanError::Api)?;
+    let available = unsafe { instance.enumerate_device_extension_properties(physical) }
+        .map_err(VulkanError::Api)?;
 
-    let mut ext_ptrs: Vec<_> = REQUIRED_DEVICE_EXTENSIONS.iter().map(|e| e.as_ptr()).collect();
+    let mut ext_ptrs: Vec<_> = REQUIRED_DEVICE_EXTENSIONS
+        .iter()
+        .map(|e| e.as_ptr())
+        .collect();
     let optional_available = extensions::filter_supported(&available, OPTIONAL_DEVICE_EXTENSIONS);
     ext_ptrs.extend(&optional_available);
 
-    let all_requested: Vec<&'static CStr> = REQUIRED_DEVICE_EXTENSIONS.iter().chain(OPTIONAL_DEVICE_EXTENSIONS.iter()).copied().collect();
+    let all_requested: Vec<&'static CStr> = REQUIRED_DEVICE_EXTENSIONS
+        .iter()
+        .chain(OPTIONAL_DEVICE_EXTENSIONS.iter())
+        .copied()
+        .collect();
     let enabled_names = extensions::find_enabled(&available, &all_requested);
 
     for name in &enabled_names {
@@ -110,11 +154,18 @@ fn create_logical_device(
     }
 
     let queue_priorities = [1.0f32];
-    let queue_infos: Vec<_> = families.unique_indices().iter()
-        .map(|&idx| vk::DeviceQueueCreateInfo::default().queue_family_index(idx).queue_priorities(&queue_priorities))
+    let queue_infos: Vec<_> = families
+        .unique_indices()
+        .iter()
+        .map(|&idx| {
+            vk::DeviceQueueCreateInfo::default()
+                .queue_family_index(idx)
+                .queue_priorities(&queue_priorities)
+        })
         .collect();
 
-    let mut timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
+    let mut timeline =
+        vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
     let mut features2 = vk::PhysicalDeviceFeatures2::default().push_next(&mut timeline);
 
     let create_info = vk::DeviceCreateInfo::default()
@@ -123,21 +174,36 @@ fn create_logical_device(
         .push_next(&mut features2);
 
     // SAFETY: all parameters are valid
-    let device = unsafe { instance.create_device(physical, &create_info, None) }.map_err(VulkanError::Api)?;
+    let device = unsafe { instance.create_device(physical, &create_info, None) }
+        .map_err(VulkanError::Api)?;
 
     Ok((device, enabled_names))
 }
 
 fn detect_capabilities(extensions: &[&CStr]) -> DeviceCapabilities {
-    let has_timeline = extensions.iter().any(|e| e.to_string_lossy().contains("timeline_semaphore"));
-    let has_external = extensions.iter().any(|e| e.to_string_lossy().contains("external_memory"));
+    let has_timeline = extensions
+        .iter()
+        .any(|e| e.to_string_lossy().contains("timeline_semaphore"));
+    let has_external = extensions
+        .iter()
+        .any(|e| e.to_string_lossy().contains("external_memory"));
 
-    let sync_tier = if has_timeline { SyncTier::TierA } else if has_external { SyncTier::TierB } else { SyncTier::TierC };
+    let sync_tier = if has_timeline {
+        SyncTier::TierA
+    } else if has_external {
+        SyncTier::TierB
+    } else {
+        SyncTier::TierC
+    };
 
-    DeviceCapabilities { sync_tier, has_timeline_semaphore: has_timeline, has_external_memory: has_external }
+    DeviceCapabilities {
+        sync_tier,
+        has_timeline_semaphore: has_timeline,
+        has_external_memory: has_external,
+    }
 }
 
-fn extract_queues(device: &ash::Device, families: &QueueFamilies) -> DeviceQueues {
+fn extract_queues(device: &ash::Device, families: QueueFamilies) -> DeviceQueues {
     // SAFETY: device is valid, queue indices are valid
     let graphics = unsafe { device.get_device_queue(families.graphics, 0) };
     let present = unsafe { device.get_device_queue(families.present, 0) };

@@ -2,7 +2,7 @@
 //!
 //! Defines the three-tier sync strategy:
 //! - Tier A: Timeline semaphores (GPU-GPU, zero CPU blocking)
-//! - Tier B: Resource-based (sync_file, keyed mutex)
+//! - Tier B: Resource-based (`sync_file`, keyed mutex)
 //! - Tier C: CPU-coordinated fallback
 
 /// Synchronization capability tier.
@@ -10,7 +10,7 @@
 pub enum SyncTier {
     /// Timeline semaphores - best performance, zero CPU blocking.
     TierA,
-    /// Resource-based sync (sync_file on Linux, keyed mutex on Windows).
+    /// Resource-based sync (`sync_file` on Linux, keyed mutex on Windows).
     TierB,
     /// CPU-coordinated fallback - works everywhere but adds latency.
     TierC,
@@ -35,19 +35,14 @@ impl SyncTier {
 }
 
 /// Platform-specific sync handle.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum SyncHandle {
     /// No synchronization needed (already synchronized).
+    #[default]
     None,
     /// Timeline semaphore value to wait on.
     Timeline { value: u64 },
-    /// File descriptor for sync_file (Linux).
+    /// File descriptor for `sync_file` (Linux).
     #[cfg(target_os = "linux")]
     SyncFile { fd: std::os::unix::io::RawFd },
-}
-
-impl Default for SyncHandle {
-    fn default() -> Self {
-        Self::None
-    }
 }

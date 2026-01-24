@@ -21,17 +21,21 @@ impl WgpuBridge {
     /// # Safety
     /// The `VulkanInstance` and `VulkanDevice` must outlive this bridge.
     /// The caller is responsible for ensuring proper synchronization.
-    pub unsafe fn new(
-        instance: &VulkanInstance,
-        device: &VulkanDevice,
-    ) -> PalResult<Self> {
+    pub unsafe fn new(instance: &VulkanInstance, device: &VulkanDevice) -> PalResult<Self> {
         let (wgpu_device, wgpu_queue) = create_wgpu_device(instance, device)?;
         info!("wgpu bridge created from native Vulkan handles");
-        Ok(Self { device: wgpu_device, queue: wgpu_queue })
+        Ok(Self {
+            device: wgpu_device,
+            queue: wgpu_queue,
+        })
     }
 
-    pub fn device(&self) -> &wgpu::Device { &self.device }
-    pub fn queue(&self) -> &wgpu::Queue { &self.queue }
+    pub fn device(&self) -> &wgpu::Device {
+        &self.device
+    }
+    pub fn queue(&self) -> &wgpu::Queue {
+        &self.queue
+    }
 }
 
 /// Creates wgpu device/queue by wrapping native Vulkan handles via HAL.
@@ -63,15 +67,18 @@ fn create_wgpu_device(
             None, // drop_guard - we manage lifetime externally
         )
     }
-    .map_err(|e| PalError::Bridge(format!("HAL instance: {:?}", e)))?;
+    .map_err(|e| PalError::Bridge(format!("HAL instance: {e:?}")))?;
 
-    // SAFETY: physical device is valid and from our instance
-    let hal_exposed = unsafe { hal_instance.expose_adapter(device.physical()) }
+    // expose_adapter is no longer unsafe in current wgpu
+    let hal_exposed = hal_instance
+        .expose_adapter(device.physical())
         .ok_or_else(|| PalError::Bridge("Failed to expose HAL adapter".into()))?;
 
     // SAFETY: instance and physical device are valid
     let available = unsafe {
-        instance.raw().enumerate_device_extension_properties(device.physical())
+        instance
+            .raw()
+            .enumerate_device_extension_properties(device.physical())
     }
     .map_err(|e| PalError::Bridge(e.to_string()))?;
 
@@ -97,7 +104,7 @@ fn create_wgpu_device(
             0,
         )
     }
-    .map_err(|e| PalError::Bridge(format!("HAL device: {:?}", e)))?;
+    .map_err(|e| PalError::Bridge(format!("HAL device: {e:?}")))?;
 
     // SAFETY: hal_instance is valid
     let wgpu_instance = unsafe { wgpu::Instance::from_hal::<Vulkan>(hal_instance) };

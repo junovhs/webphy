@@ -4,7 +4,7 @@ use ash::vk;
 use std::collections::HashSet;
 use std::ffi::CStr;
 
-/// Extracts CStr from extension properties.
+/// Extracts `CStr` from extension properties.
 fn ext_name(ext: &vk::ExtensionProperties) -> &CStr {
     // SAFETY: Vulkan spec guarantees null-terminated extension_name
     unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) }
