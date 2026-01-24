@@ -1,98 +1,145 @@
-//! Vulkan device creation and management
+//! Vulkan logical device creation and management.
 
-use super::helpers;
-use crate::{Compositor, PlatformDevice, SyncCapabilities, UiRenderTarget};
-use ash::vk;
-use nitrate_core::{Error, Extent2D, Result};
+use super::extensions;
+use super::queues::{find_queue_families, QueueFamilies};
+use super::{OPTIONAL_DEVICE_EXTENSIONS, REQUIRED_DEVICE_EXTENSIONS};
+use crate::error::{PalResult, VulkanError};
+use crate::sync::SyncTier;
+use crate::vulkan::VulkanInstance;
+use ash::{khr, vk};
 use std::ffi::CStr;
-use tracing::info;
+use tracing::{debug, info};
 
-/// Container for raw Vulkan handles and capabilities
-pub struct VulkanContext {
-    #[allow(dead_code)]
-    pub entry: ash::Entry,
-    #[allow(dead_code)]
-    pub instance: ash::Instance,
-    #[allow(dead_code)]
-    pub physical_device: vk::PhysicalDevice,
-    pub device: ash::Device,
-    #[allow(dead_code)]
-    pub queue_family: u32,
-    #[allow(dead_code)]
-    pub queue: vk::Queue,
-    pub sync_caps: SyncCapabilities,
-}
-
-impl VulkanContext {
-    fn is_valid(&self) -> bool {
-        self.device.handle() != vk::Device::null()
-    }
-}
-
-/// Vulkan-based platform device
+/// Vulkan device with associated queues and capabilities.
 pub struct VulkanDevice {
-    ctx: VulkanContext,
+    physical: vk::PhysicalDevice,
+    device: ash::Device,
+    queues: DeviceQueues,
+    families: QueueFamilies,
+    capabilities: DeviceCapabilities,
+    swapchain_loader: khr::swapchain::Device,
+}
+
+/// Device queues extracted after creation.
+pub struct DeviceQueues {
+    pub graphics: vk::Queue,
+    pub present: vk::Queue,
+}
+
+/// Runtime capability detection.
+#[derive(Debug, Clone)]
+pub struct DeviceCapabilities {
+    pub sync_tier: SyncTier,
+    pub has_timeline_semaphore: bool,
+    pub has_external_memory: bool,
 }
 
 impl VulkanDevice {
-    pub fn new() -> Result<Self> {
-        // SAFETY: Loading Vulkan library is safe if the library exists.
-        let entry = unsafe { ash::Entry::load() }
-            .map_err(|e| Error::DeviceCreation(format!("Failed to load Vulkan: {e}")))?;
+    /// Creates device on best available physical device.
+    pub fn new(instance: &VulkanInstance, surface: vk::SurfaceKHR) -> PalResult<Self> {
+        let physical = select_physical_device(instance, surface)?;
+        let families = find_queue_families(instance.raw(), physical, instance.surface_loader(), surface)
+            .ok_or(VulkanError::DeviceCreation("No suitable queues".into()))?;
 
-        let instance = helpers::create_instance(&entry)?;
-        let physical_device = helpers::pick_physical_device(&instance)?;
-        
-        // SAFETY: Valid instance and physical device from above.
-        let props = unsafe { instance.get_physical_device_properties(physical_device) };
-        // SAFETY: device_name is a null-terminated C string from Vulkan.
-        let device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) };
-        info!("Selected GPU: {}", device_name.to_string_lossy());
+        let (device, enabled_exts) = create_logical_device(instance.raw(), physical, &families)?;
+        let capabilities = detect_capabilities(&enabled_exts);
 
-        let queue_family = helpers::find_queue_family(&instance, physical_device)?;
-        let sync_caps = helpers::detect_sync_capabilities(&instance, physical_device);
-        info!("Sync tier: {:?} - {}", sync_caps.max_tier, sync_caps.max_tier.description());
+        info!("Sync tier: {:?}", capabilities.sync_tier);
 
-        let (device, queue) = helpers::create_logical_device(
-            &instance, physical_device, queue_family, sync_caps
-        )?;
+        let queues = extract_queues(&device, &families);
+        let swapchain_loader = khr::swapchain::Device::new(instance.raw(), &device);
 
-        info!("Vulkan device created successfully");
-
-        let ctx = VulkanContext {
-            entry, instance, physical_device, device, queue_family, queue, sync_caps,
-        };
-
-        Ok(Self { ctx })
+        Ok(Self { physical, device, queues, families, capabilities, swapchain_loader })
     }
 
-    pub fn context(&self) -> &VulkanContext { &self.ctx }
-}
-
-impl PlatformDevice for VulkanDevice {
-    fn sync_capabilities(&self) -> SyncCapabilities { self.ctx.sync_caps }
-
-    fn create_ui_render_target(&self, _extent: Extent2D) -> Result<Box<dyn UiRenderTarget>> {
-        if !self.ctx.is_valid() {
-            return Err(Error::DeviceCreation("Device state invalid".into()));
-        }
-        Err(Error::PlatformNotSupported("UI render target not yet implemented".into()))
-    }
-
-    fn create_compositor(&self) -> Result<Box<dyn Compositor>> {
-        if !self.ctx.is_valid() {
-            return Err(Error::DeviceCreation("Device state invalid".into()));
-        }
-        Err(Error::PlatformNotSupported("Compositor not yet implemented".into()))
-    }
+    pub fn raw(&self) -> &ash::Device { &self.device }
+    pub fn physical(&self) -> vk::PhysicalDevice { self.physical }
+    pub fn queues(&self) -> &DeviceQueues { &self.queues }
+    pub fn families(&self) -> &QueueFamilies { &self.families }
+    pub fn capabilities(&self) -> &DeviceCapabilities { &self.capabilities }
+    pub fn swapchain_loader(&self) -> &khr::swapchain::Device { &self.swapchain_loader }
 }
 
 impl Drop for VulkanDevice {
     fn drop(&mut self) {
-        // SAFETY: Destroying Vulkan objects we own. Called once on drop.
+        // SAFETY: We own the device and are shutting down
         unsafe {
-            self.ctx.device.destroy_device(None);
-            self.ctx.instance.destroy_instance(None);
+            self.device.device_wait_idle().ok();
+            self.device.destroy_device(None);
         }
+        debug!("Vulkan device destroyed");
     }
+}
+
+fn select_physical_device(instance: &VulkanInstance, surface: vk::SurfaceKHR) -> PalResult<vk::PhysicalDevice> {
+    // SAFETY: instance is valid
+    let devices = unsafe { instance.raw().enumerate_physical_devices() }.map_err(VulkanError::Api)?;
+
+    devices.into_iter()
+        .find(|&pd| is_device_suitable(instance, pd, surface))
+        .ok_or_else(|| VulkanError::DeviceCreation("No suitable GPU".into()).into())
+}
+
+fn is_device_suitable(instance: &VulkanInstance, physical: vk::PhysicalDevice, surface: vk::SurfaceKHR) -> bool {
+    let has_queues = find_queue_families(instance.raw(), physical, instance.surface_loader(), surface).is_some();
+
+    // SAFETY: instance and physical device are valid
+    let extensions = unsafe { instance.raw().enumerate_device_extension_properties(physical) }.unwrap_or_default();
+    let has_extensions = extensions::check_required(&extensions, REQUIRED_DEVICE_EXTENSIONS).is_ok();
+
+    has_queues && has_extensions
+}
+
+fn create_logical_device(
+    instance: &ash::Instance,
+    physical: vk::PhysicalDevice,
+    families: &QueueFamilies,
+) -> PalResult<(ash::Device, Vec<&'static CStr>)> {
+    // SAFETY: instance and physical are valid
+    let available = unsafe { instance.enumerate_device_extension_properties(physical) }.map_err(VulkanError::Api)?;
+
+    let mut ext_ptrs: Vec<_> = REQUIRED_DEVICE_EXTENSIONS.iter().map(|e| e.as_ptr()).collect();
+    let optional_available = extensions::filter_supported(&available, OPTIONAL_DEVICE_EXTENSIONS);
+    ext_ptrs.extend(&optional_available);
+
+    let all_requested: Vec<&'static CStr> = REQUIRED_DEVICE_EXTENSIONS.iter().chain(OPTIONAL_DEVICE_EXTENSIONS.iter()).copied().collect();
+    let enabled_names = extensions::find_enabled(&available, &all_requested);
+
+    for name in &enabled_names {
+        debug!("Device extension: {:?}", name);
+    }
+
+    let queue_priorities = [1.0f32];
+    let queue_infos: Vec<_> = families.unique_indices().iter()
+        .map(|&idx| vk::DeviceQueueCreateInfo::default().queue_family_index(idx).queue_priorities(&queue_priorities))
+        .collect();
+
+    let mut timeline = vk::PhysicalDeviceTimelineSemaphoreFeatures::default().timeline_semaphore(true);
+    let mut features2 = vk::PhysicalDeviceFeatures2::default().push_next(&mut timeline);
+
+    let create_info = vk::DeviceCreateInfo::default()
+        .queue_create_infos(&queue_infos)
+        .enabled_extension_names(&ext_ptrs)
+        .push_next(&mut features2);
+
+    // SAFETY: all parameters are valid
+    let device = unsafe { instance.create_device(physical, &create_info, None) }.map_err(VulkanError::Api)?;
+
+    Ok((device, enabled_names))
+}
+
+fn detect_capabilities(extensions: &[&CStr]) -> DeviceCapabilities {
+    let has_timeline = extensions.iter().any(|e| e.to_string_lossy().contains("timeline_semaphore"));
+    let has_external = extensions.iter().any(|e| e.to_string_lossy().contains("external_memory"));
+
+    let sync_tier = if has_timeline { SyncTier::TierA } else if has_external { SyncTier::TierB } else { SyncTier::TierC };
+
+    DeviceCapabilities { sync_tier, has_timeline_semaphore: has_timeline, has_external_memory: has_external }
+}
+
+fn extract_queues(device: &ash::Device, families: &QueueFamilies) -> DeviceQueues {
+    // SAFETY: device is valid, queue indices are valid
+    let graphics = unsafe { device.get_device_queue(families.graphics, 0) };
+    let present = unsafe { device.get_device_queue(families.present, 0) };
+    DeviceQueues { graphics, present }
 }

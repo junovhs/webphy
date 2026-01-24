@@ -1,0 +1,8 @@
+{"timestamp":1769296971,"kind":"check_started"}
+{"timestamp":1769296972,"kind":{"check_failed":{"exit_code":101}}}
+{"timestamp":1769296973,"kind":{"check_failed":{"exit_code":101}}}
+{"timestamp":1769296974,"kind":{"check_failed":{"exit_code":1}}}
+{"timestamp":1769297422,"kind":"check_started"}
+{"timestamp":1769297423,"kind":{"check_failed":{"exit_code":101}}}
+{"timestamp":1769297424,"kind":{"check_failed":{"exit_code":101}}}
+{"timestamp":1769297425,"kind":{"check_failed":{"exit_code":1}}}

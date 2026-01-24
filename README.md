@@ -1,74 +1,86 @@
-# NITRATE — Volatile Memory
+# NITRATE - Spike 1: Native Host
 
-Physics-based film simulation engine with native GPU rendering.
+## Overview
 
-## Architecture
+This implements the "Native Owns, wgpu Borrows" architecture for Phase 1.
+
+## Structure
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    NATIVE LAYER (owns resources)            │
-│  • Video decoder surfaces (VA-API / MF / VideoToolbox)      │
-│  • UI render target (exportable to wgpu)                    │
-│  • Timeline semaphores for GPU-GPU sync                     │
-└─────────────────────────────────────────────────────────────┘
-                             │
-                   Import handles + sync
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    WGPU LAYER (borrows)                     │
-│  • Vello renders UI to imported render target               │
-│  • Composition shader samples video + UI                    │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Crates
-
-| Crate | Purpose |
-|-------|---------|
-| `nitrate-core` | Shared types, error handling |
-| `nitrate-pal` | Platform abstraction (Vulkan/D3D12/Metal) |
-| `nitrate-color` | Color space transforms, tone mapping |
-| `nitrate-decode` | Hardware video decoding |
-| `nitrate-ui` | Vello-based UI rendering |
-| `nitrate-compositor` | Video + UI composition |
-| `nitrate-app` | Application framework |
-
-## Sync Tiers
-
-Not all platforms support the same level of GPU-GPU synchronization:
-
-- **Tier A**: Timeline semaphores (Vulkan 1.2, D3D12 fences, Metal shared events)
-- **Tier B**: Binary sync with explicit sync_file import  
-- **Tier C**: CPU coordination (fallback)
-
-## Building
-
-```bash
-cargo build --release
+nitrate/
+├── Cargo.toml                 # Workspace config
+└── crates/
+    ├── nitrate-pal/           # Platform Abstraction Layer
+    │   ├── src/
+    │   │   ├── lib.rs         # Main exports
+    │   │   ├── error.rs       # Error types
+    │   │   ├── sync.rs        # Sync tiers (A/B/C)
+    │   │   ├── surface.rs     # Video surface types
+    │   │   └── vulkan/
+    │   │       ├── mod.rs
+    │   │       ├── instance.rs   # VkInstance + validation
+    │   │       ├── device.rs     # VkDevice + queue selection
+    │   │       ├── swapchain.rs  # Native swapchain
+    │   │       ├── bridge.rs     # wgpu HAL wrapper
+    │   │       ├── extensions.rs # Extension helpers
+    │   │       └── queues.rs     # Queue family selection
+    │   └── tests/
+    │       └── vulkan_tests.rs
+    │
+    └── nitrate-app/
+        ├── src/
+        │   ├── main.rs        # Placeholder main
+        │   └── bin/
+        │       └── spike1.rs  # Spike 1 test binary
+        └── Cargo.toml
 ```
 
 ## Running
 
 ```bash
-cargo run -p nitrate-app
+# Build and run spike1
+cargo run --bin spike1
+
+# With validation layers
+RUST_LOG=spike1=debug,nitrate_pal=debug,vulkan=debug cargo run --bin spike1
+
+# Run tests
+cargo test --package nitrate-pal
 ```
 
-## Reference
+## Pass Criteria
 
-The `reference/` directory contains the UI design to be recreated in Vello:
-- `ui-design.css` - Original CSS from Dioxus mockup
+1. ✅ Orange screen (#e07030) appears
+2. ✅ Zero Vulkan validation errors
+3. ✅ wgpu device created from native handles
+4. ✅ Sync tier detected (TierA if timeline semaphores available)
 
-## Performance Targets
+## Architecture Validated
 
-- 4K 24fps playback minimum
-- 8K with buffering acceptable
-- Zero-copy decode → render pipeline
-- Linear-space HDR compositing
+- Native ash::Instance created with validation layers
+- Native ash::Device with required extensions:
+  - VK_KHR_swapchain
+  - VK_KHR_timeline_semaphore (optional, enables TierA)
+  - VK_KHR_external_memory_fd (optional, enables TierB)
+- wgpu Device/Queue wrapped via HAL from existing handles
+- Native swapchain with proper synchronization
+- Frame sync: semaphores + fences per frame-in-flight
 
-## Platforms
+## Key Files
 
-| Platform | Decode | Sync | Status |
-|----------|--------|------|--------|
-| Linux | VA-API | Timeline Semaphores | In Progress |
-| Windows | Media Foundation | D3D12 Fences | Planned |
-| macOS | VideoToolbox | MTLSharedEvent | Planned |
+| File | Purpose | Tokens |
+|------|---------|--------|
+| `vulkan/instance.rs` | VkInstance + debug callback | ~400 |
+| `vulkan/device.rs` | Physical device selection + logical device | ~450 |
+| `vulkan/swapchain.rs` | Native swapchain management | ~500 |
+| `vulkan/bridge.rs` | wgpu HAL wrapping | ~300 |
+| `spike1.rs` | Test harness | ~450 |
+
+All files stay under the 2000 token limit.
+
+## Next Steps
+
+After spike1 passes:
+1. **Spike 2**: DMA-BUF roundtrip (export VkImage → import wgpu)
+2. **Spike 3**: Command stealing (extract VkCommandBuffer from wgpu)
+3. **Spike 4**: Timeline sync validation

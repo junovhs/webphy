@@ -1,12 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/nitrate-core",
     "crates/nitrate-pal",
-    "crates/nitrate-color",
-    "crates/nitrate-decode",
-    "crates/nitrate-ui",
-    "crates/nitrate-compositor",
     "crates/nitrate-app",
 ]
 
@@ -49,12 +44,7 @@ bytemuck = { version = "1.14", features = ["derive"] }
 bitflags = "2.4"
 
 # Internal crates
-nitrate-core = { path = "crates/nitrate-core" }
 nitrate-pal = { path = "crates/nitrate-pal" }
-nitrate-color = { path = "crates/nitrate-color" }
-nitrate-decode = { path = "crates/nitrate-decode" }
-nitrate-ui = { path = "crates/nitrate-ui" }
-nitrate-compositor = { path = "crates/nitrate-compositor" }
 
 [profile.release]
 lto = true

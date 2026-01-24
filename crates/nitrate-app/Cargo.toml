@@ -2,21 +2,35 @@
 name = "nitrate-app"
 version.workspace = true
 edition.workspace = true
+description = "NITRATE application binaries and spike tests"
 
 [[bin]]
 name = "nitrate"
 path = "src/main.rs"
 
-[dependencies]
-nitrate-core.workspace = true
-nitrate-pal.workspace = true
-nitrate-color.workspace = true
-nitrate-ui.workspace = true
-nitrate-compositor.workspace = true
+[[bin]]
+name = "spike1"
+path = "src/bin/spike1.rs"
 
-winit.workspace = true
-wgpu.workspace = true
+[dependencies]
+# Internal crates
+nitrate-pal.workspace = true
+
+# Error handling
+anyhow.workspace = true
+
+# Logging
 tracing.workspace = true
 tracing-subscriber.workspace = true
-anyhow.workspace = true
+
+# Graphics
+wgpu.workspace = true
+winit.workspace = true
+raw-window-handle.workspace = true
+
+# Vulkan
+ash.workspace = true
+ash-window.workspace = true
+
+# Async
 pollster = "0.4"

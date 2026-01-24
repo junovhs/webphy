@@ -1,134 +1,184 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-24 01:16:05
+Generated: 2026-01-24 15:30:25
 Status: FAILED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
+  13   crates/nitrate-pal/src/vulkan/queues.rs
+  6    crates/nitrate-pal/src/vulkan/instance.rs
   6    crates/nitrate-pal/src/vulkan/helpers.rs
   6    crates/nitrate-app/src/app.rs
-  4    crates/nitrate-core/src/lib.rs
-  4    crates/nitrate-pal/src/sync.rs
-  2    crates/nitrate-app/src/gpu.rs
+  6    crates/nitrate-app/src/bin/spike1.rs
 
 Top 5 Largest Files (Tokens):
   4355  docs/roadmap.md
-  1518  docs/architecture-deep-dive.md
-  1372  crates/nitrate-pal/src/vulkan/helpers.rs
-  1294  crates/nitrate-color/src/lib.rs
-  1250  crates/nitrate-pal/src/surface.rs
+  2686  docs/SPECIFICATION.md
+  2343  crates/nitrate-pal/src/vulkan/swapchain.rs
+  1629  crates/nitrate-app/src/bin/spike1.rs
+  1466  crates/nitrate-pal/src/vulkan/instance.rs
 
 === VIOLATIONS ===
 [SlopChop Internal Rules]
-crates/nitrate-pal/src/sync.rs:86 | LCOM4 | Class 'CpuSync' has low cohesion (LCOM4: 2)
+crates/nitrate-pal/src/vulkan/instance.rs:30 | LAW OF INTEGRITY | Syntax error detected
+crates/nitrate-pal/src/vulkan/instance.rs:30 | LAW OF INTEGRITY | Syntax error detected
+crates/nitrate-pal/src/vulkan/instance.rs:32 | LAW OF INTEGRITY | Syntax error detected
+crates/nitrate-pal/src/vulkan/instance.rs:32 | LAW OF INTEGRITY | Syntax error detected
+crates/nitrate-pal/src/vulkan/instance.rs:124 | LAW OF INTEGRITY | Syntax error detected
+crates/nitrate-pal/src/vulkan/instance.rs:124 | LAW OF INTEGRITY | Syntax error detected
+crates/nitrate-pal/src/vulkan/instance.rs:10 | LCOM4 | Class 'VulkanInstance' has low cohesion (LCOM4: 3)
+crates/nitrate-pal/src/vulkan/device.rs:143 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
+crates/nitrate-pal/src/vulkan/device.rs:14 | LCOM4 | Class 'VulkanDevice' has low cohesion (LCOM4: 6)
+crates/nitrate-pal/src/vulkan/swapchain.rs:1 | LAW OF ATOMICITY | File size is 2343 tokens (Limit: 2000)
+crates/nitrate-pal/src/vulkan/swapchain.rs:141 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
+crates/nitrate-pal/src/vulkan/swapchain.rs:143 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
+crates/nitrate-pal/src/vulkan/swapchain.rs:151 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
+crates/nitrate-pal/src/vulkan/swapchain.rs:152 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
+crates/nitrate-pal/src/vulkan/swapchain.rs:153 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
+crates/nitrate-pal/src/vulkan/swapchain.rs:11 | LCOM4 | Class 'Swapchain' has low cohesion (LCOM4: 4)
+crates/nitrate-pal/src/vulkan/swapchain.rs:11 | CBO | Class 'Swapchain' is tightly coupled (CBO: 23)
+crates/nitrate-pal/src/vulkan/swapchain.rs:11 | SFOUT | Class 'Swapchain' has high fan-out (SFOUT: 12)
+crates/nitrate-app/src/bin/spike1.rs:77 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
 
 [External Tools]
+FAILED: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate (Exit Code: 101)
+-- STDOUT --
+
+-- STDERR --
+    Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
+error: unnecessary `unsafe` block
+  --> crates/nitrate-pal/src/vulkan/bridge.rs:69:23
+   |
+69 |     let hal_exposed = unsafe { hal_instance.expose_adapter(device.physical()) }
+   |                       ^^^^^^ unnecessary `unsafe` block
+   |
+   = note: `-D unused-unsafe` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_unsafe)]`
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_extension_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:103:21
+    |
+103 |     let available = entry.enumerate_instance_extension_properties(None)
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_layer_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:126:21
+    |
+126 |     let available = entry.enumerate_instance_layer_properties()
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+For more information about this error, try `rustc --explain E0133`.
+error: could not compile `nitrate-pal` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nitrate-pal` (lib test) due to 3 previous errors
+
+FAILED: cargo test (Exit Code: 101)
+-- STDOUT --
+
+-- STDERR --
+   Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
+warning: unnecessary `unsafe` block
+  --> crates/nitrate-pal/src/vulkan/bridge.rs:69:23
+   |
+69 |     let hal_exposed = unsafe { hal_instance.expose_adapter(device.physical()) }
+   |                       ^^^^^^ unnecessary `unsafe` block
+   |
+   = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_extension_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:103:21
+    |
+103 |     let available = entry.enumerate_instance_extension_properties(None)
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_layer_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:126:21
+    |
+126 |     let available = entry.enumerate_instance_layer_properties()
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+For more information about this error, try `rustc --explain E0133`.
+warning: `nitrate-pal` (lib) generated 1 warning
+error: could not compile `nitrate-pal` (lib) due to 2 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `nitrate-pal` (lib test) generated 1 warning (1 duplicate)
+error: could not compile `nitrate-pal` (lib test) due to 2 previous errors; 1 warning emitted
+
 
 === FULL OUTPUT LOGS ===
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate
     Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-    Checking nitrate-ui v0.1.0 (/home/juno/nitrate/crates/nitrate-ui)
-    Checking nitrate-compositor v0.1.0 (/home/juno/nitrate/crates/nitrate-compositor)
-    Checking nitrate-decode v0.1.0 (/home/juno/nitrate/crates/nitrate-decode)
-    Checking nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
-    Finished `dev` profile [optimized + debuginfo] target(s) in 0.55s
+error: unnecessary `unsafe` block
+  --> crates/nitrate-pal/src/vulkan/bridge.rs:69:23
+   |
+69 |     let hal_exposed = unsafe { hal_instance.expose_adapter(device.physical()) }
+   |                       ^^^^^^ unnecessary `unsafe` block
+   |
+   = note: `-D unused-unsafe` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(unused_unsafe)]`
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_extension_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:103:21
+    |
+103 |     let available = entry.enumerate_instance_extension_properties(None)
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_layer_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:126:21
+    |
+126 |     let available = entry.enumerate_instance_layer_properties()
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+For more information about this error, try `rustc --explain E0133`.
+error: could not compile `nitrate-pal` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nitrate-pal` (lib test) due to 3 previous errors
 
 
 >>> COMMAND: cargo test
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 2 tests
-test tests::color_uniforms_size ... ok
-test tests::yuv_matrix_size ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 4 tests
-test tests::extent_pixel_count ... ok
-test tests::frame_id_increment ... ok
-test tests::frame_id_validity ... ok
-test tests::pixel_format_plane_counts ... ok
-
-test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 3 tests
-test sync::tests::cpu_sync_works ... ok
-test sync::tests::sync_tier_ordering ... ok
-test sync::tests::timeline_values_monotonic ... ok
-
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
-running 0 tests
-
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-
-
    Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-   Compiling nitrate-ui v0.1.0 (/home/juno/nitrate/crates/nitrate-ui)
-   Compiling nitrate-compositor v0.1.0 (/home/juno/nitrate/crates/nitrate-compositor)
-   Compiling nitrate-decode v0.1.0 (/home/juno/nitrate/crates/nitrate-decode)
-   Compiling nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
-    Finished `test` profile [optimized + debuginfo] target(s) in 0.55s
-     Running unittests src/main.rs (target/debug/deps/nitrate-137fb85b4453cc16)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_color-931f666b067e1494)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_compositor-63d096c93065b80f)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_core-0f5a5b9e5dd5b82d)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_decode-63aa81cbf0f244ef)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_pal-d4572f3af7eaf482)
-     Running unittests src/lib.rs (target/debug/deps/nitrate_ui-000abc01f46c9423)
-   Doc-tests nitrate_color
-   Doc-tests nitrate_compositor
-   Doc-tests nitrate_core
-   Doc-tests nitrate_decode
-   Doc-tests nitrate_pal
-   Doc-tests nitrate_ui
+warning: unnecessary `unsafe` block
+  --> crates/nitrate-pal/src/vulkan/bridge.rs:69:23
+   |
+69 |     let hal_exposed = unsafe { hal_instance.expose_adapter(device.physical()) }
+   |                       ^^^^^^ unnecessary `unsafe` block
+   |
+   = note: `#[warn(unused_unsafe)]` (part of `#[warn(unused)]`) on by default
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_extension_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:103:21
+    |
+103 |     let available = entry.enumerate_instance_extension_properties(None)
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+error[E0133]: call to unsafe function `ash::Entry::enumerate_instance_layer_properties` is unsafe and requires unsafe function or block
+   --> crates/nitrate-pal/src/vulkan/instance.rs:126:21
+    |
+126 |     let available = entry.enumerate_instance_layer_properties()
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ call to unsafe function
+    |
+    = note: consult the function's documentation for information on how to avoid undefined behavior
+
+For more information about this error, try `rustc --explain E0133`.
+warning: `nitrate-pal` (lib) generated 1 warning
+error: could not compile `nitrate-pal` (lib) due to 2 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `nitrate-pal` (lib test) generated 1 warning (1 duplicate)
+error: could not compile `nitrate-pal` (lib test) due to 2 previous errors; 1 warning emitted
 
 
 >>> COMMAND: slopchop scan --locality

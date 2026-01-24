@@ -2,24 +2,34 @@
 name = "nitrate-pal"
 version.workspace = true
 edition.workspace = true
-
-[dependencies]
-nitrate-core.workspace = true
-thiserror.workspace = true
-tracing.workspace = true
-arrayvec.workspace = true
-bitflags.workspace = true
-raw-window-handle.workspace = true
-wgpu.workspace = true
-
-# Vulkan (Linux primary, Windows secondary)
-ash.workspace = true
-ash-window.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-# Linux-specific: DRM, VA-API bindings would go here
-# For now we use ash directly
+description = "Platform Abstraction Layer - Native Vulkan/D3D12/Metal with wgpu HAL bridge"
 
 [features]
 default = ["vulkan"]
-vulkan = []
+vulkan = ["ash", "ash-window"]
+
+[dependencies]
+# Error handling
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Graphics - wgpu with HAL access
+wgpu = { workspace = true, features = ["vulkan-portability"] }
+
+# Window handling
+winit.workspace = true
+raw-window-handle.workspace = true
+
+# Vulkan (Linux primary)
+ash = { workspace = true, optional = true }
+ash-window = { workspace = true, optional = true }
+
+# Collections
+arrayvec.workspace = true
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }
+pollster = "0.4"

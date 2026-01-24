@@ -4,5 +4,3 @@ Cargo.lock
 *.swo
 .DS_Store
 *.log
-.slopchop
-.slopchop_apply_backup

@@ -1,106 +1,124 @@
-//! Bridge between Native Vulkan and wgpu
+//! WGPU HAL Bridge - Wraps native Vulkan handles for wgpu use.
+//!
+//! This is the core of the "Native Owns, wgpu Borrows" architecture.
+//! We create ash handles first, then wrap them for wgpu's use.
 
+use super::{VulkanDevice, VulkanInstance};
+use crate::error::{PalError, PalResult};
 use ash::vk;
-use nitrate_core::{Error, Result};
-use tracing::info;
-use wgpu::hal::api::Vulkan;
+use std::ffi::CStr;
+use tracing::{debug, info};
 
-/// Configuration for bridge creation
-pub struct BridgeConfig {
-    pub entry: ash::Entry,
-    pub instance: ash::Instance,
-    pub physical_device: vk::PhysicalDevice,
-    pub device: ash::Device,
-    pub queue_family_index: u32,
-    pub queue_index: u32,
-}
-
-/// Bridge providing wgpu access to native Vulkan resources
+/// Bridge that exposes wgpu Device/Queue from native Vulkan handles.
 pub struct WgpuBridge {
     device: wgpu::Device,
     queue: wgpu::Queue,
 }
 
 impl WgpuBridge {
+    /// Creates wgpu device by wrapping existing Vulkan handles.
+    ///
     /// # Safety
-    /// Caller must ensure Vulkan handles remain valid for bridge lifetime.
-    pub unsafe fn new(config: &BridgeConfig) -> Result<Self> {
-        let hal_instance = Self::wrap_instance(config)?;
-        let wgpu_instance = wgpu::Instance::from_hal::<Vulkan>(hal_instance);
-        
-        let hal_exposed = Self::expose_adapter(&wgpu_instance, config)?;
-        let wgpu_adapter = wgpu_instance.create_adapter_from_hal(hal_exposed);
-        
-        let (device, queue) = Self::wrap_device(&wgpu_adapter, config)?;
-
-        info!("wgpu bridge created successfully");
-        Ok(Self { device, queue })
-    }
-
-    unsafe fn wrap_instance(
-        config: &BridgeConfig,
-    ) -> Result<<Vulkan as wgpu::hal::Api>::Instance> {
-        <Vulkan as wgpu::hal::Api>::Instance::from_raw(
-            config.entry.clone(),
-            config.instance.clone(),
-            0,
-            vk::API_VERSION_1_2,
-            None,
-            Vec::new(),
-            wgpu::InstanceFlags::empty(),
-            false,
-            None,
-        ).map_err(|e| Error::DeviceCreation(format!("HAL instance: {e}")))
-    }
-
-    unsafe fn expose_adapter(
-        instance: &wgpu::Instance,
-        config: &BridgeConfig,
-    ) -> Result<wgpu::hal::ExposedAdapter<Vulkan>> {
-        instance
-            .as_hal::<Vulkan>()
-            .ok_or_else(|| Error::DeviceCreation("Not Vulkan".into()))?
-            .expose_adapter(config.physical_device)
-            .ok_or_else(|| Error::DeviceCreation("Failed to expose adapter".into()))
-    }
-
-    unsafe fn wrap_device(
-        adapter: &wgpu::Adapter,
-        config: &BridgeConfig,
-    ) -> Result<(wgpu::Device, wgpu::Queue)> {
-        let hints = wgpu::MemoryHints::Performance;
-        
-        let open_device: Option<std::result::Result<_, _>> = adapter
-            .as_hal::<Vulkan, _, _>(|hal_adapter| {
-                hal_adapter.map(|a| {
-                    a.device_from_raw(
-                        config.device.clone(),
-                        None,
-                        &[],
-                        wgpu::Features::empty(),
-                        &hints,
-                        config.queue_family_index,
-                        config.queue_index,
-                    )
-                })
-            });
-
-        let hal_device = open_device
-            .ok_or_else(|| Error::DeviceCreation("No HAL adapter".into()))?
-            .map_err(|e| Error::DeviceCreation(format!("HAL device: {e}")))?;
-
-        let desc = wgpu::DeviceDescriptor {
-            label: Some("NITRATE Bridge"),
-            required_features: wgpu::Features::empty(),
-            required_limits: wgpu::Limits::default(),
-            memory_hints: wgpu::MemoryHints::Performance,
-        };
-
-        adapter
-            .create_device_from_hal(hal_device, &desc, None)
-            .map_err(|e| Error::DeviceCreation(format!("wgpu device: {e}")))
+    /// The `VulkanInstance` and `VulkanDevice` must outlive this bridge.
+    /// The caller is responsible for ensuring proper synchronization.
+    pub unsafe fn new(
+        instance: &VulkanInstance,
+        device: &VulkanDevice,
+    ) -> PalResult<Self> {
+        let (wgpu_device, wgpu_queue) = create_wgpu_device(instance, device)?;
+        info!("wgpu bridge created from native Vulkan handles");
+        Ok(Self { device: wgpu_device, queue: wgpu_queue })
     }
 
     pub fn device(&self) -> &wgpu::Device { &self.device }
     pub fn queue(&self) -> &wgpu::Queue { &self.queue }
+}
+
+/// Creates wgpu device/queue by wrapping native Vulkan handles via HAL.
+fn create_wgpu_device(
+    instance: &VulkanInstance,
+    device: &VulkanDevice,
+) -> PalResult<(wgpu::Device, wgpu::Queue)> {
+    use wgpu::hal::api::Vulkan;
+
+    let families = device.families();
+
+    debug!(
+        "Creating HAL bridge: physical={:?}, queue_family={}",
+        device.physical(),
+        families.graphics
+    );
+
+    // SAFETY: We're wrapping valid ash handles that we own
+    let hal_instance = unsafe {
+        <Vulkan as wgpu::hal::Api>::Instance::from_raw(
+            instance.entry().clone(),
+            instance.raw().clone(),
+            vk::API_VERSION_1_2,
+            0,
+            None,
+            vec![ash::khr::surface::NAME],
+            wgpu::InstanceFlags::empty(),
+            false,
+            None, // drop_guard - we manage lifetime externally
+        )
+    }
+    .map_err(|e| PalError::Bridge(format!("HAL instance: {:?}", e)))?;
+
+    // SAFETY: physical device is valid and from our instance
+    let hal_exposed = unsafe { hal_instance.expose_adapter(device.physical()) }
+        .ok_or_else(|| PalError::Bridge("Failed to expose HAL adapter".into()))?;
+
+    // SAFETY: instance and physical device are valid
+    let available = unsafe {
+        instance.raw().enumerate_device_extension_properties(device.physical())
+    }
+    .map_err(|e| PalError::Bridge(e.to_string()))?;
+
+    let extension_names: Vec<&CStr> = available
+        .iter()
+        .map(|ext| {
+            // SAFETY: Vulkan guarantees null-terminated extension names
+            unsafe { CStr::from_ptr(ext.extension_name.as_ptr()) }
+        })
+        .collect();
+
+    let memory_hints = wgpu::MemoryHints::Performance;
+
+    // SAFETY: device handle is valid, extensions match what device was created with
+    let hal_open_device = unsafe {
+        hal_exposed.adapter.device_from_raw(
+            device.raw().clone(),
+            None, // drop_guard - we manage device lifetime
+            &extension_names,
+            wgpu::Features::empty(),
+            &memory_hints,
+            families.graphics,
+            0,
+        )
+    }
+    .map_err(|e| PalError::Bridge(format!("HAL device: {:?}", e)))?;
+
+    // SAFETY: hal_instance is valid
+    let wgpu_instance = unsafe { wgpu::Instance::from_hal::<Vulkan>(hal_instance) };
+
+    // SAFETY: hal_exposed is valid and from our instance
+    let wgpu_adapter = unsafe { wgpu_instance.create_adapter_from_hal(hal_exposed) };
+
+    // SAFETY: hal_open_device matches the adapter
+    let (wgpu_device, wgpu_queue) = unsafe {
+        wgpu_adapter.create_device_from_hal(
+            hal_open_device,
+            &wgpu::DeviceDescriptor {
+                label: Some("nitrate-bridge"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: wgpu::MemoryHints::Performance,
+            },
+            None,
+        )
+    }
+    .map_err(|e| PalError::Bridge(e.to_string()))?;
+
+    Ok((wgpu_device, wgpu_queue))
 }
