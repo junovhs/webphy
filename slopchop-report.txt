@@ -1,5 +1,5 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-24 17:25:52
+Generated: 2026-01-24 19:21:12
 Status: PASSED
 
 === DASHBOARD ===
@@ -13,9 +13,9 @@ Top 5 Cognitive Complexity:
 Top 5 Largest Files (Tokens):
   4355  docs/roadmap.md
   2686  docs/SPECIFICATION.md
-  1852  crates/nitrate-app/src/bin/spike1.rs
+  1877  crates/nitrate-app/src/bin/spike1.rs
+  1835  crates/nitrate-pal/src/vulkan/presentation/handle.rs
   1639  crates/nitrate-pal/src/vulkan/instance.rs
-  1435  crates/nitrate-pal/src/vulkan/device.rs
 
 === VIOLATIONS ===
 None. Codebase is clean.
@@ -40,16 +40,27 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-running 0 tests
+running 11 tests
+test vulkan::extensions::tests::test_check_required_missing ... ok
+test vulkan::extensions::tests::test_check_required_success ... ok
+test vulkan::extensions::tests::test_filter_supported ... ok
+test vulkan::extensions::tests::test_find_enabled ... ok
+test vulkan::presentation::handle::tests::test_resolve_extent_clamped ... ok
+test vulkan::presentation::handle::tests::test_resolve_extent_fixed ... ok
+test vulkan::presentation::handle::tests::test_resolve_image_count ... ok
+test vulkan::presentation::handle::tests::test_select_format_fallback ... ok
+test vulkan::presentation::handle::tests::test_select_format_preferred ... ok
+test vulkan::queues::tests::test_distinct_queues ... ok
+test vulkan::queues::tests::test_unified_queues ... ok
 
-test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 4 tests
 test color_metadata_defaults ... ok
-test sync_tier_cpu_blocking ... ok
 test plane_descriptor_defaults ... ok
 test sync_tier_descriptions ... ok
+test sync_tier_cpu_blocking ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -61,7 +72,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
    Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
    Compiling nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
-    Finished `test` profile [optimized + debuginfo] target(s) in 0.56s
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.48s
      Running unittests src/main.rs (target/debug/deps/nitrate-db265e04ada05349)
      Running unittests src/bin/spike1.rs (target/debug/deps/spike1-784ceec3551dcb52)
      Running unittests src/lib.rs (target/debug/deps/nitrate_pal-38f350d7a3ecb507)

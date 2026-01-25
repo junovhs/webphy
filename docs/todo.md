@@ -1,35 +1,35 @@
-# ⚡ CURRENT FOCUS: SPIKE 1 (Native Host)
+# ⚡ CURRENT FOCUS: SPIKE 2 (DMA-BUF Roundtrip)
 
-**Objective:** Get a window open, create a Vulkan device natively, wrap it in wgpu, and clear the screen.
+**Objective:** Allocate native memory, export as DMA-BUF, import to wgpu, and verify zero-copy texturing.
 
-- [ ] **Step 0: Project Scaffold**
-    - [ ] Initialize workspace `Cargo.toml`
-    - [ ] Create `crates/nitrate-pal`
-    - [ ] Create `crates/nitrate-app`
-    - [ ] Add dependencies (`ash`, `wgpu`, `winit`, `raw-window-handle`)
+- [x] **Step 0: Project Scaffold**
+    - [x] Initialize workspace `Cargo.toml`
+    - [x] Create `crates/nitrate-pal`
+    - [x] Create `crates/nitrate-app`
+    - [x] Add dependencies (`ash`, `wgpu`, `winit`, `raw-window-handle`)
 
-- [ ] **Step 1: Native Vulkan Device**
-    - [ ] Implement `nitrate-pal/src/vulkan/device.rs` -> `create_vulkan_device()`
-    - [ ] Ensure required extensions (`VK_KHR_external_memory_fd`, `VK_KHR_timeline_semaphore`) are enabled.
+- [x] **Step 1: Native Vulkan Device**
+    - [x] Implement `nitrate-pal/src/vulkan/device.rs` -> `create_vulkan_device()`
+    - [x] Ensure required extensions (`VK_KHR_external_memory_fd`, `VK_KHR_timeline_semaphore`) are enabled.
 
-- [ ] **Step 2: The WGPU Wrapper (The "Unsafe" Bridge)**
-    - [ ] Implement `nitrate-pal/src/vulkan/bridge.rs`
-    - [ ] Function `unsafe fn create_wgpu_device(ash_instance, ash_device) -> wgpu::Device`
-    - [ ] Use `wgpu::hal::api::Vulkan` to wrap the raw handles.
+- [x] **Step 2: The WGPU Wrapper (The "Unsafe" Bridge)**
+    - [x] Implement `nitrate-pal/src/vulkan/bridge.rs`
+    - [x] Function `unsafe fn create_wgpu_device(ash_instance, ash_device) -> wgpu::Device`
+    - [x] Use `wgpu::hal::api::Vulkan` to wrap the raw handles.
 
-- [ ] **Step 3: The Swapchain**
-    - [ ] Implement `nitrate-pal/src/vulkan/swapchain.rs` using `ash-window`.
-    - [ ] Needs `acquire_next_image` and `present` methods.
+- [x] **Step 3: The Swapchain**
+    - [x] Implement `nitrate-pal/src/vulkan/swapchain.rs` (Refactored to `PresentationEngine`) using `ash-window`.
+    - [x] Needs `acquire_next_image` and `present` methods.
 
-- [ ] **Step 4: The Binary (`spike1.rs`)**
-    - [ ] Wire it all together: Window -> Device -> Bridge -> Swapchain -> Wgpu Clear Pass -> Present.
+- [x] **Step 4: The Binary (`spike1.rs`)**
+    - [x] Wire it all together: Window -> Device -> Bridge -> Swapchain -> Wgpu Clear Pass -> Present.
 
 ## Phase 1: Prove the Bridge
 
-**Spike 1: Native Host**
-- [ ] `swapchain.rs` — native ash swapchain creation, image acquisition, present
-- [ ] `spike1.rs` — binary that uses VulkanDevice + WgpuBridge + native swapchain
-- [ ] validate — run with VK_LAYER_KHRONOS_validation, fix all errors
+**Spike 1: Native Host** [COMPLETED]
+- [x] `swapchain.rs` — native ash swapchain creation, image acquisition, present
+- [x] `spike1.rs` — binary that uses VulkanDevice + WgpuBridge + native swapchain
+- [x] validate — run with VK_LAYER_KHRONOS_validation, fix all errors
 
 **Spike 2: DMA-BUF Roundtrip**
 - [ ] `export.rs` — allocate VkImage with exportable memory, return DMA-BUF fd

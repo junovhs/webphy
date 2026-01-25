@@ -54,7 +54,6 @@ pub fn find_enabled(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
 mod tests {
     use super::*;
     use std::ffi::CString;
@@ -66,8 +65,6 @@ mod tests {
         let bytes = c_name.as_bytes_with_nul();
         // Copy bytes into the fixed-size array
         let len = bytes.len().min(prop.extension_name.len() - 1);
-        // SAFETY: We are copying into a fixed-size C-style array and manually
-        // ensuring null termination. The destination buffer is owned by the struct.
         unsafe {
             std::ptr::copy_nonoverlapping(
                 bytes.as_ptr(),
@@ -115,15 +112,10 @@ mod tests {
         let available = vec![make_prop("VK_EXT_A"), make_prop("VK_EXT_B")];
         let ext_a = CString::new("VK_EXT_A").unwrap();
         let ext_c = CString::new("VK_EXT_C").unwrap();
+        let ext_a_static = Box::leak(ext_a.into_boxed_c_str());
+        let ext_c_static = Box::leak(ext_c.into_boxed_c_str());
 
-        // Explicit type annotation ensures we get a shared reference (&T), which is Copy.
-        // Box::leak returns &mut T, which is NOT Copy (move-only), causing borrow checker errors
-        // when used multiple times (once in find_enabled, once in assert_eq).
-        let ext_a_static: &'static CStr = Box::leak(ext_a.into_boxed_c_str());
-        let ext_missing: &'static CStr = Box::leak(ext_c.into_boxed_c_str());
-
-        let enabled = find_enabled(&available, &[ext_a_static, ext_missing]);
-
+        let enabled = find_enabled(&available, &[ext_a_static, ext_c_static]);
         assert_eq!(enabled, vec![ext_a_static]);
     }
 }
