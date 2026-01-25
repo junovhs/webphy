@@ -1,10 +1,10 @@
 //! Vulkan logical device creation and management.
 
-use super::capabilities::{self, DeviceCapabilities};
 use super::extensions;
 use super::queues::{find_queue_families, QueueFamilies};
 use super::{OPTIONAL_DEVICE_EXTENSIONS, REQUIRED_DEVICE_EXTENSIONS};
 use crate::error::{PalResult, VulkanError};
+use crate::sync::SyncTier;
 use crate::vulkan::VulkanInstance;
 use ash::{khr, vk};
 use std::ffi::CStr;
@@ -26,6 +26,14 @@ pub struct DeviceQueues {
     pub present: vk::Queue,
 }
 
+/// Runtime capability detection.
+#[derive(Debug, Clone)]
+pub struct DeviceCapabilities {
+    pub sync_tier: SyncTier,
+    pub has_timeline_semaphore: bool,
+    pub has_external_memory: bool,
+}
+
 impl VulkanDevice {
     /// Creates device on best available physical device.
     pub fn new(instance: &VulkanInstance, surface: vk::SurfaceKHR) -> PalResult<Self> {
@@ -36,7 +44,7 @@ impl VulkanDevice {
 
         let (device, enabled_exts) =
             create_logical_device(&instance.instance, physical, &families)?;
-        let capabilities = capabilities::detect_capabilities(&enabled_exts);
+        let capabilities = detect_capabilities(&enabled_exts);
 
         info!("Sync tier: {:?}", capabilities.sync_tier);
 
@@ -84,6 +92,19 @@ fn select_physical_device(
         .ok_or_else(|| VulkanError::DeviceCreation("No suitable GPU".into()).into())
 }
 
+/// Pure logic check for device suitability.
+/// Extracted to allow unit testing without a real GPU.
+fn check_device_suitability(
+    has_queues: bool,
+    available_extensions: &[vk::ExtensionProperties],
+    required_extensions: &[&'static CStr],
+) -> bool {
+    if !has_queues {
+        return false;
+    }
+    extensions::check_required(available_extensions, required_extensions).is_ok()
+}
+
 fn is_device_suitable(
     instance: &VulkanInstance,
     physical: vk::PhysicalDevice,
@@ -105,7 +126,7 @@ fn is_device_suitable(
     }
     .unwrap_or_default();
 
-    capabilities::check_device_suitability(has_queues, &extensions, REQUIRED_DEVICE_EXTENSIONS)
+    check_device_suitability(has_queues, &extensions, REQUIRED_DEVICE_EXTENSIONS)
 }
 
 fn create_logical_device(
@@ -162,10 +183,104 @@ fn create_logical_device(
     Ok((device, enabled_names))
 }
 
+fn detect_capabilities(extensions: &[&CStr]) -> DeviceCapabilities {
+    let has_timeline = extensions
+        .iter()
+        .any(|e| e.to_string_lossy().contains("timeline_semaphore"));
+    let has_external = extensions
+        .iter()
+        .any(|e| e.to_string_lossy().contains("external_memory"));
+
+    let sync_tier = if has_timeline {
+        SyncTier::TierA
+    } else if has_external {
+        SyncTier::TierB
+    } else {
+        SyncTier::TierC
+    };
+
+    DeviceCapabilities {
+        sync_tier,
+        has_timeline_semaphore: has_timeline,
+        has_external_memory: has_external,
+    }
+}
+
 fn extract_queues(device: &ash::Device, families: QueueFamilies) -> DeviceQueues {
     // SAFETY: device is valid, queue indices are valid from creation.
     let graphics = unsafe { device.get_device_queue(families.graphics, 0) };
     // SAFETY: device is valid, queue indices are valid from creation.
     let present = unsafe { device.get_device_queue(families.present, 0) };
     DeviceQueues { graphics, present }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::indexing_slicing)]
+mod tests {
+    use super::*;
+    use std::ffi::CString;
+
+    // Helper to create extension property
+    fn make_ext(name: &str) -> vk::ExtensionProperties {
+        let mut prop = vk::ExtensionProperties::default();
+        let c_name = CString::new(name).unwrap();
+        let bytes = c_name.as_bytes_with_nul();
+        let len = bytes.len().min(prop.extension_name.len() - 1);
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                bytes.as_ptr(),
+                prop.extension_name.as_mut_ptr().cast(),
+                len,
+            );
+            prop.extension_name[len] = 0;
+        }
+        prop
+    }
+
+    #[test]
+    fn test_device_suitability_ok() {
+        let exts = vec![make_ext("VK_KHR_swapchain")];
+        let req = CString::new("VK_KHR_swapchain").unwrap();
+        // Leak to get 'static lifetime for tests
+        let req_ref = Box::leak(req.into_boxed_c_str());
+
+        assert!(check_device_suitability(true, &exts, &[req_ref]));
+    }
+
+    #[test]
+    fn test_device_suitability_no_queues() {
+        let exts = vec![make_ext("VK_KHR_swapchain")];
+        let req = CString::new("VK_KHR_swapchain").unwrap();
+        let req_ref = Box::leak(req.into_boxed_c_str());
+
+        assert!(!check_device_suitability(false, &exts, &[req_ref]));
+    }
+
+    #[test]
+    fn test_device_suitability_missing_ext() {
+        let exts = vec![make_ext("VK_OTHER_EXTENSION")];
+        let req = CString::new("VK_KHR_swapchain").unwrap();
+        let req_ref = Box::leak(req.into_boxed_c_str());
+
+        assert!(!check_device_suitability(true, &exts, &[req_ref]));
+    }
+
+    #[test]
+    fn test_detect_capabilities() {
+        let timeline = CString::new("VK_KHR_timeline_semaphore").unwrap();
+        let external = CString::new("VK_KHR_external_memory_fd").unwrap();
+        
+        // Explicitly annotate as static reference to avoid move errors
+        let timeline_ref: &'static CStr = Box::leak(timeline.into_boxed_c_str());
+        let external_ref: &'static CStr = Box::leak(external.into_boxed_c_str());
+
+        let cap_a = detect_capabilities(&[timeline_ref]);
+        assert_eq!(cap_a.sync_tier, SyncTier::TierA);
+
+        let cap_b = detect_capabilities(&[external_ref]);
+        assert_eq!(cap_b.sync_tier, SyncTier::TierB);
+
+        let cap_c = detect_capabilities(&[]);
+        assert_eq!(cap_c.sync_tier, SyncTier::TierC);
+    }
 }

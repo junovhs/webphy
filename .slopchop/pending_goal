@@ -1,1 +1,1 @@
-Resolve clippy warnings for `unwrap()` and `indexing_slicing` in test code.
+Resolve `doc-markdown` and `indexing-slicing` warnings in the newly created `capabilities.rs`.

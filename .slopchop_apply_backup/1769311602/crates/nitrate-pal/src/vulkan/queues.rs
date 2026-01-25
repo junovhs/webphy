@@ -14,11 +14,13 @@ pub struct QueueFamilies {
 
 impl QueueFamilies {
     /// Returns true if graphics and present are the same family.
+    #[must_use]
     pub const fn is_unified(self) -> bool {
         self.graphics == self.present
     }
 
     /// Returns unique family indices.
+    #[must_use]
     pub fn unique_indices(self) -> Vec<u32> {
         if self.is_unified() {
             vec![self.graphics]
@@ -75,5 +77,33 @@ pub fn find_queue_families(
             })
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unified_queues() {
+        let q = QueueFamilies {
+            graphics: 0,
+            present: 0,
+        };
+        assert!(q.is_unified());
+        assert_eq!(q.unique_indices(), vec![0]);
+    }
+
+    #[test]
+    fn test_distinct_queues() {
+        let q = QueueFamilies {
+            graphics: 0,
+            present: 1,
+        };
+        assert!(!q.is_unified());
+        let indices = q.unique_indices();
+        assert_eq!(indices.len(), 2);
+        assert!(indices.contains(&0));
+        assert!(indices.contains(&1));
     }
 }

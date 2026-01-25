@@ -108,7 +108,6 @@ pub fn find_queue_families(
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

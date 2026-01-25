@@ -1,10 +1,10 @@
 //! Vulkan logical device creation and management.
 
-use super::capabilities::{self, DeviceCapabilities};
 use super::extensions;
 use super::queues::{find_queue_families, QueueFamilies};
 use super::{OPTIONAL_DEVICE_EXTENSIONS, REQUIRED_DEVICE_EXTENSIONS};
 use crate::error::{PalResult, VulkanError};
+use crate::sync::SyncTier;
 use crate::vulkan::VulkanInstance;
 use ash::{khr, vk};
 use std::ffi::CStr;
@@ -26,6 +26,14 @@ pub struct DeviceQueues {
     pub present: vk::Queue,
 }
 
+/// Runtime capability detection.
+#[derive(Debug, Clone)]
+pub struct DeviceCapabilities {
+    pub sync_tier: SyncTier,
+    pub has_timeline_semaphore: bool,
+    pub has_external_memory: bool,
+}
+
 impl VulkanDevice {
     /// Creates device on best available physical device.
     pub fn new(instance: &VulkanInstance, surface: vk::SurfaceKHR) -> PalResult<Self> {
@@ -34,9 +42,8 @@ impl VulkanDevice {
             find_queue_families(&instance.instance, physical, &instance.surface_loader, surface)
                 .ok_or(VulkanError::DeviceCreation("No suitable queues".into()))?;
 
-        let (device, enabled_exts) =
-            create_logical_device(&instance.instance, physical, &families)?;
-        let capabilities = capabilities::detect_capabilities(&enabled_exts);
+        let (device, enabled_exts) = create_logical_device(&instance.instance, physical, &families)?;
+        let capabilities = detect_capabilities(&enabled_exts);
 
         info!("Sync tier: {:?}", capabilities.sync_tier);
 
@@ -89,23 +96,18 @@ fn is_device_suitable(
     physical: vk::PhysicalDevice,
     surface: vk::SurfaceKHR,
 ) -> bool {
-    let has_queues = find_queue_families(
-        &instance.instance,
-        physical,
-        &instance.surface_loader,
-        surface,
-    )
-    .is_some();
+    let has_queues =
+        find_queue_families(&instance.instance, physical, &instance.surface_loader, surface).is_some();
 
     // SAFETY: instance and physical device are valid.
     let extensions = unsafe {
-        instance
-            .instance
-            .enumerate_device_extension_properties(physical)
+        instance.instance.enumerate_device_extension_properties(physical)
     }
     .unwrap_or_default();
+    let has_extensions =
+        extensions::check_required(&extensions, REQUIRED_DEVICE_EXTENSIONS).is_ok();
 
-    capabilities::check_device_suitability(has_queues, &extensions, REQUIRED_DEVICE_EXTENSIONS)
+    has_queues && has_extensions
 }
 
 fn create_logical_device(
@@ -160,6 +162,29 @@ fn create_logical_device(
         .map_err(VulkanError::Api)?;
 
     Ok((device, enabled_names))
+}
+
+fn detect_capabilities(extensions: &[&CStr]) -> DeviceCapabilities {
+    let has_timeline = extensions
+        .iter()
+        .any(|e| e.to_string_lossy().contains("timeline_semaphore"));
+    let has_external = extensions
+        .iter()
+        .any(|e| e.to_string_lossy().contains("external_memory"));
+
+    let sync_tier = if has_timeline {
+        SyncTier::TierA
+    } else if has_external {
+        SyncTier::TierB
+    } else {
+        SyncTier::TierC
+    };
+
+    DeviceCapabilities {
+        sync_tier,
+        has_timeline_semaphore: has_timeline,
+        has_external_memory: has_external,
+    }
 }
 
 fn extract_queues(device: &ash::Device, families: QueueFamilies) -> DeviceQueues {

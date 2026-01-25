@@ -1,10 +1,10 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-24 19:21:12
+Generated: 2026-01-24 19:29:49
 Status: PASSED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
-  13   crates/nitrate-pal/src/vulkan/queues.rs
+  15   crates/nitrate-pal/src/vulkan/queues.rs
   11   crates/nitrate-app/src/bin/spike1.rs
   6    crates/nitrate-pal/src/vulkan/instance.rs
   6    crates/nitrate-pal/src/vulkan/helpers.rs
@@ -14,7 +14,7 @@ Top 5 Largest Files (Tokens):
   4355  docs/roadmap.md
   2686  docs/SPECIFICATION.md
   1877  crates/nitrate-app/src/bin/spike1.rs
-  1835  crates/nitrate-pal/src/vulkan/presentation/handle.rs
+  1851  crates/nitrate-pal/src/vulkan/presentation/handle.rs
   1639  crates/nitrate-pal/src/vulkan/instance.rs
 
 === VIOLATIONS ===
@@ -25,7 +25,7 @@ None. Codebase is clean.
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate
     Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
     Checking nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
-    Finished `dev` profile [optimized + debuginfo] target(s) in 0.43s
+    Finished `dev` profile [optimized + debuginfo] target(s) in 0.50s
 
 
 >>> COMMAND: cargo test
@@ -40,7 +40,11 @@ running 0 tests
 test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
-running 11 tests
+running 18 tests
+test vulkan::capabilities::tests::test_detect_capabilities ... ok
+test vulkan::capabilities::tests::test_device_suitability_missing_ext ... ok
+test vulkan::capabilities::tests::test_device_suitability_no_queues ... ok
+test vulkan::capabilities::tests::test_device_suitability_ok ... ok
 test vulkan::extensions::tests::test_check_required_missing ... ok
 test vulkan::extensions::tests::test_check_required_success ... ok
 test vulkan::extensions::tests::test_filter_supported ... ok
@@ -51,16 +55,19 @@ test vulkan::presentation::handle::tests::test_resolve_image_count ... ok
 test vulkan::presentation::handle::tests::test_select_format_fallback ... ok
 test vulkan::presentation::handle::tests::test_select_format_preferred ... ok
 test vulkan::queues::tests::test_distinct_queues ... ok
+test vulkan::queues::tests::test_missing_graphics ... ok
+test vulkan::queues::tests::test_missing_present ... ok
+test vulkan::queues::tests::test_prefer_unified ... ok
 test vulkan::queues::tests::test_unified_queues ... ok
 
-test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
 
 running 4 tests
 test color_metadata_defaults ... ok
 test plane_descriptor_defaults ... ok
-test sync_tier_descriptions ... ok
 test sync_tier_cpu_blocking ... ok
+test sync_tier_descriptions ... ok
 
 test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
 
@@ -72,7 +79,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 
    Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
    Compiling nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
-    Finished `test` profile [optimized + debuginfo] target(s) in 0.48s
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.47s
      Running unittests src/main.rs (target/debug/deps/nitrate-db265e04ada05349)
      Running unittests src/bin/spike1.rs (target/debug/deps/spike1-784ceec3551dcb52)
      Running unittests src/lib.rs (target/debug/deps/nitrate_pal-38f350d7a3ecb507)

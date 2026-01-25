@@ -4,7 +4,6 @@
 //! This is the "Native Host" that owns all GPU resources.
 
 mod bridge;
-pub mod capabilities;
 mod device;
 mod extensions;
 mod instance;
@@ -12,7 +11,6 @@ pub mod presentation;
 mod queues;
 
 pub use bridge::WgpuBridge;
-pub use capabilities::DeviceCapabilities;
 pub use device::VulkanDevice;
 pub use instance::VulkanInstance;
 pub use presentation::{AcquiredFrame, PresentationConfig, PresentationEngine};
