@@ -7,13 +7,13 @@ mod bridge;
 mod device;
 mod extensions;
 mod instance;
+pub mod presentation;
 mod queues;
-mod swapchain;
 
 pub use bridge::WgpuBridge;
 pub use device::VulkanDevice;
 pub use instance::VulkanInstance;
-pub use swapchain::{AcquiredImage, Swapchain};
+pub use presentation::{AcquiredFrame, PresentationConfig, PresentationEngine};
 
 /// Required device extensions for full functionality.
 pub const REQUIRED_DEVICE_EXTENSIONS: &[&std::ffi::CStr] = &[

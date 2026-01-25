@@ -5,10 +5,9 @@
 //! This is the main application entry point.
 //! For architecture validation, run `spike1` binary.
 
-use anyhow::Result;
 use tracing::info;
 
-fn main() -> Result<()> {
+fn main() {
     tracing_subscriber::fmt()
         .with_env_filter("nitrate=debug,wgpu=warn")
         .init();
@@ -16,6 +15,4 @@ fn main() -> Result<()> {
     info!("NITRATE — Volatile Memory");
     info!("Main application not yet implemented.");
     info!("Run 'cargo run --bin spike1' to test the native host architecture.");
-
-    Ok(())
 }

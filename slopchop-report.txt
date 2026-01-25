@@ -1,38 +1,30 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-24 15:47:41
+Generated: 2026-01-24 17:13:54
 Status: FAILED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
-  13   crates/nitrate-pal/src/vulkan/swapchain.rs
   13   crates/nitrate-pal/src/vulkan/queues.rs
   6    crates/nitrate-pal/src/vulkan/instance.rs
   6    crates/nitrate-pal/src/vulkan/helpers.rs
   6    crates/nitrate-app/src/app.rs
+  4    crates/nitrate-core/src/lib.rs
 
 Top 5 Largest Files (Tokens):
   4355  docs/roadmap.md
   2686  docs/SPECIFICATION.md
-  1629  crates/nitrate-app/src/bin/spike1.rs
-  1610  crates/nitrate-pal/src/vulkan/instance.rs
-  1487  crates/nitrate-pal/src/vulkan/device.rs
+  2088  crates/nitrate-pal/src/vulkan/swapchain_helpers.rs
+  1971  crates/nitrate-pal/src/vulkan/swapchain/backend.rs
+  1628  crates/nitrate-app/src/bin/spike1.rs
 
 === VIOLATIONS ===
 [SlopChop Internal Rules]
-crates/nitrate-pal/src/vulkan/instance.rs:31 | LAW OF INTEGRITY | Syntax error detected
-crates/nitrate-pal/src/vulkan/instance.rs:31 | LAW OF INTEGRITY | Syntax error detected
-crates/nitrate-pal/src/vulkan/instance.rs:33 | LAW OF INTEGRITY | Syntax error detected
-crates/nitrate-pal/src/vulkan/instance.rs:33 | LAW OF INTEGRITY | Syntax error detected
-crates/nitrate-pal/src/vulkan/instance.rs:145 | LAW OF INTEGRITY | Syntax error detected
-crates/nitrate-pal/src/vulkan/instance.rs:145 | LAW OF INTEGRITY | Syntax error detected
-crates/nitrate-pal/src/vulkan/instance.rs:28 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
-crates/nitrate-pal/src/vulkan/instance.rs:48 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
-crates/nitrate-pal/src/vulkan/instance.rs:125 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
-crates/nitrate-pal/src/vulkan/instance.rs:10 | LCOM4 | Class 'VulkanInstance' has low cohesion (LCOM4: 3)
-crates/nitrate-pal/src/vulkan/device.rs:100 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
-crates/nitrate-pal/src/vulkan/device.rs:209 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
-crates/nitrate-pal/src/vulkan/device.rs:14 | LCOM4 | Class 'VulkanDevice' has low cohesion (LCOM4: 6)
-crates/nitrate-app/src/bin/spike1.rs:77 | LAW OF PARANOIA | Unsafe block missing justification. Add '// SAFETY:' comment.
+crates/nitrate-pal/src/vulkan/swapchain_helpers.rs:1 | LAW OF ATOMICITY | File size is 2088 tokens (Limit: 2000)
+crates/nitrate-pal/src/vulkan/swapchain_helpers.rs:44 | CBO | Class 'SwapchainBackend' is tightly coupled (CBO: 18)
+crates/nitrate-pal/src/vulkan/swapchain_helpers.rs:44 | SFOUT | Class 'SwapchainBackend' has high fan-out (SFOUT: 10)
+crates/nitrate-pal/src/vulkan/presentation/engine.rs:30 | CBO | Class 'PresentationEngine' is tightly coupled (CBO: 12)
+crates/nitrate-pal/src/vulkan/swapchain/backend.rs:12 | CBO | Class 'SwapchainBackend' is tightly coupled (CBO: 20)
+crates/nitrate-pal/src/vulkan/swapchain/backend.rs:12 | SFOUT | Class 'SwapchainBackend' has high fan-out (SFOUT: 11)
 
 [External Tools]
 FAILED: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate (Exit Code: 101)
@@ -40,82 +32,88 @@ FAILED: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy:
 
 -- STDERR --
     Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `swapchain::AcquiredImage`, `swapchain::Swapchain`
-  --> crates/nitrate-pal/src/vulkan/mod.rs:16:21
+error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
+  --> crates/nitrate-pal/src/lib.rs:38:18
    |
-16 | pub use swapchain::{AcquiredImage, Swapchain};
-   |                     ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan::swapchain`
-   |                     |
-   |                     no `AcquiredImage` in `vulkan::swapchain`
+38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
+   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
+   |                  |
+   |                  no `AcquiredImage` in `vulkan`
+   |                  help: a similar name exists in the module: `AcquiredFrame`
    |
    = help: consider importing this variant instead:
            crate::PalError::Swapchain
 
 For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
 error: could not compile `nitrate-pal` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nitrate-pal` (lib test) due to 1 previous error
 
 FAILED: cargo test (Exit Code: 101)
 -- STDOUT --
 
 -- STDERR --
+    Blocking waiting for file lock on build directory
    Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `swapchain::AcquiredImage`, `swapchain::Swapchain`
-  --> crates/nitrate-pal/src/vulkan/mod.rs:16:21
+error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
+  --> crates/nitrate-pal/src/lib.rs:38:18
    |
-16 | pub use swapchain::{AcquiredImage, Swapchain};
-   |                     ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan::swapchain`
-   |                     |
-   |                     no `AcquiredImage` in `vulkan::swapchain`
+38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
+   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
+   |                  |
+   |                  no `AcquiredImage` in `vulkan`
+   |                  help: a similar name exists in the module: `AcquiredFrame`
    |
    = help: consider importing this variant instead:
            crate::PalError::Swapchain
 
 For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
 error: could not compile `nitrate-pal` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nitrate-pal` (lib test) due to 1 previous error
 
 
 === FULL OUTPUT LOGS ===
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate
     Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `swapchain::AcquiredImage`, `swapchain::Swapchain`
-  --> crates/nitrate-pal/src/vulkan/mod.rs:16:21
+error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
+  --> crates/nitrate-pal/src/lib.rs:38:18
    |
-16 | pub use swapchain::{AcquiredImage, Swapchain};
-   |                     ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan::swapchain`
-   |                     |
-   |                     no `AcquiredImage` in `vulkan::swapchain`
+38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
+   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
+   |                  |
+   |                  no `AcquiredImage` in `vulkan`
+   |                  help: a similar name exists in the module: `AcquiredFrame`
    |
    = help: consider importing this variant instead:
            crate::PalError::Swapchain
 
 For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
 error: could not compile `nitrate-pal` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nitrate-pal` (lib test) due to 1 previous error
 
 
 >>> COMMAND: cargo test
+    Blocking waiting for file lock on build directory
    Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `swapchain::AcquiredImage`, `swapchain::Swapchain`
-  --> crates/nitrate-pal/src/vulkan/mod.rs:16:21
+error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
+  --> crates/nitrate-pal/src/lib.rs:38:18
    |
-16 | pub use swapchain::{AcquiredImage, Swapchain};
-   |                     ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan::swapchain`
-   |                     |
-   |                     no `AcquiredImage` in `vulkan::swapchain`
+38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
+   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
+   |                  |
+   |                  no `AcquiredImage` in `vulkan`
+   |                  help: a similar name exists in the module: `AcquiredFrame`
    |
    = help: consider importing this variant instead:
            crate::PalError::Swapchain
 
 For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
 error: could not compile `nitrate-pal` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `nitrate-pal` (lib test) due to 1 previous error
 
 
 >>> COMMAND: slopchop scan --locality

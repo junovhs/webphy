@@ -1,10 +1,14 @@
 //! Native Vulkan swapchain facade.
 //!
 //! This acts as a high-level wrapper around the implementation logic
-//! located in `swapchain_helpers.rs` (the "backend").
+//! located in `backend.rs`.
 
-use super::swapchain_helpers::{SwapchainBackend, SwapchainConfig};
-pub use super::swapchain_helpers::AcquiredImage;
+mod backend;
+mod types;
+
+pub use backend::SwapchainBackend;
+pub use types::{AcquiredImage, SwapchainConfig};
+
 use crate::error::PalResult;
 use ash::vk;
 

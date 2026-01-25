@@ -45,19 +45,21 @@ fn create_wgpu_device(
 ) -> PalResult<(wgpu::Device, wgpu::Queue)> {
     use wgpu::hal::api::Vulkan;
 
-    let families = device.families();
+    let families = &device.families;
 
     debug!(
         "Creating HAL bridge: physical={:?}, queue_family={}",
-        device.physical(),
+        device.physical,
         families.graphics
     );
 
-    // SAFETY: We're wrapping valid ash handles that we own
+    // SAFETY: We're wrapping valid ash handles that we own.
+    // We clone the handles because wgpu expects to own them, but since we are keeping
+    // the native objects alive externally, this shared ownership is managed by the architecture.
     let hal_instance = unsafe {
         <Vulkan as wgpu::hal::Api>::Instance::from_raw(
-            instance.entry().clone(),
-            instance.raw().clone(),
+            instance.entry.clone(),
+            instance.instance.clone(),
             vk::API_VERSION_1_2,
             0,
             None,
@@ -71,14 +73,14 @@ fn create_wgpu_device(
 
     // expose_adapter is no longer unsafe in current wgpu
     let hal_exposed = hal_instance
-        .expose_adapter(device.physical())
+        .expose_adapter(device.physical)
         .ok_or_else(|| PalError::Bridge("Failed to expose HAL adapter".into()))?;
 
     // SAFETY: instance and physical device are valid
     let available = unsafe {
         instance
-            .raw()
-            .enumerate_device_extension_properties(device.physical())
+            .instance
+            .enumerate_device_extension_properties(device.physical)
     }
     .map_err(|e| PalError::Bridge(e.to_string()))?;
 
@@ -95,7 +97,7 @@ fn create_wgpu_device(
     // SAFETY: device handle is valid, extensions match what device was created with
     let hal_open_device = unsafe {
         hal_exposed.adapter.device_from_raw(
-            device.raw().clone(),
+            device.device.clone(),
             None, // drop_guard - we manage device lifetime
             &extension_names,
             wgpu::Features::empty(),
