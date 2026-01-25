@@ -22,12 +22,6 @@ pub enum PalError {
 
     #[error("HAL bridge error: {0}")]
     Bridge(String),
-
-    #[error("Export failed: {0}")]
-    Export(String),
-
-    #[error("Import failed: {0}")]
-    Import(String),
 }
 
 /// Vulkan-specific errors.
@@ -47,12 +41,6 @@ pub enum VulkanError {
 
     #[error("Vulkan API error: {0}")]
     Api(#[from] ash::vk::Result),
-
-    #[error("Memory allocation failed: {0}")]
-    MemoryAllocation(String),
-
-    #[error("External memory export failed: {0}")]
-    ExternalMemory(String),
 }
 
 /// Result alias for PAL operations.

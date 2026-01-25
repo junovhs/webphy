@@ -1,1 +1,1 @@
-Resolve `doc-markdown` and `indexing-slicing` warnings in the newly created `capabilities.rs`.
+Fix binary/module structure and clippy lints.
