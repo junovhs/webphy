@@ -1,119 +1,72 @@
 SLOPCHOP CHECK REPORT
-Generated: 2026-01-24 17:13:54
-Status: FAILED
+Generated: 2026-01-24 17:25:52
+Status: PASSED
 
 === DASHBOARD ===
 Top 5 Cognitive Complexity:
   13   crates/nitrate-pal/src/vulkan/queues.rs
+  11   crates/nitrate-app/src/bin/spike1.rs
   6    crates/nitrate-pal/src/vulkan/instance.rs
   6    crates/nitrate-pal/src/vulkan/helpers.rs
   6    crates/nitrate-app/src/app.rs
-  4    crates/nitrate-core/src/lib.rs
 
 Top 5 Largest Files (Tokens):
   4355  docs/roadmap.md
   2686  docs/SPECIFICATION.md
-  2088  crates/nitrate-pal/src/vulkan/swapchain_helpers.rs
-  1971  crates/nitrate-pal/src/vulkan/swapchain/backend.rs
-  1628  crates/nitrate-app/src/bin/spike1.rs
+  1852  crates/nitrate-app/src/bin/spike1.rs
+  1639  crates/nitrate-pal/src/vulkan/instance.rs
+  1435  crates/nitrate-pal/src/vulkan/device.rs
 
 === VIOLATIONS ===
-[SlopChop Internal Rules]
-crates/nitrate-pal/src/vulkan/swapchain_helpers.rs:1 | LAW OF ATOMICITY | File size is 2088 tokens (Limit: 2000)
-crates/nitrate-pal/src/vulkan/swapchain_helpers.rs:44 | CBO | Class 'SwapchainBackend' is tightly coupled (CBO: 18)
-crates/nitrate-pal/src/vulkan/swapchain_helpers.rs:44 | SFOUT | Class 'SwapchainBackend' has high fan-out (SFOUT: 10)
-crates/nitrate-pal/src/vulkan/presentation/engine.rs:30 | CBO | Class 'PresentationEngine' is tightly coupled (CBO: 12)
-crates/nitrate-pal/src/vulkan/swapchain/backend.rs:12 | CBO | Class 'SwapchainBackend' is tightly coupled (CBO: 20)
-crates/nitrate-pal/src/vulkan/swapchain/backend.rs:12 | SFOUT | Class 'SwapchainBackend' has high fan-out (SFOUT: 11)
-
-[External Tools]
-FAILED: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate (Exit Code: 101)
--- STDOUT --
-
--- STDERR --
-    Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
-  --> crates/nitrate-pal/src/lib.rs:38:18
-   |
-38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
-   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
-   |                  |
-   |                  no `AcquiredImage` in `vulkan`
-   |                  help: a similar name exists in the module: `AcquiredFrame`
-   |
-   = help: consider importing this variant instead:
-           crate::PalError::Swapchain
-
-For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
-
-FAILED: cargo test (Exit Code: 101)
--- STDOUT --
-
--- STDERR --
-    Blocking waiting for file lock on build directory
-   Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
-  --> crates/nitrate-pal/src/lib.rs:38:18
-   |
-38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
-   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
-   |                  |
-   |                  no `AcquiredImage` in `vulkan`
-   |                  help: a similar name exists in the module: `AcquiredFrame`
-   |
-   = help: consider importing this variant instead:
-           crate::PalError::Swapchain
-
-For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
-
+None. Codebase is clean.
 
 === FULL OUTPUT LOGS ===
 
 >>> COMMAND: cargo clippy --all-targets -- -D warnings -W clippy::pedantic -W clippy::unwrap_used -W clippy::expect_used -W clippy::indexing_slicing -A clippy::struct_excessive_bools -A clippy::module_name_repetitions -A clippy::missing_errors_doc -A clippy::must_use_candidate
     Checking nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
-  --> crates/nitrate-pal/src/lib.rs:38:18
-   |
-38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
-   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
-   |                  |
-   |                  no `AcquiredImage` in `vulkan`
-   |                  help: a similar name exists in the module: `AcquiredFrame`
-   |
-   = help: consider importing this variant instead:
-           crate::PalError::Swapchain
-
-For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
+    Checking nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 0.43s
 
 
 >>> COMMAND: cargo test
-    Blocking waiting for file lock on build directory
-   Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
-error[E0432]: unresolved imports `vulkan::AcquiredImage`, `vulkan::Swapchain`
-  --> crates/nitrate-pal/src/lib.rs:38:18
-   |
-38 | pub use vulkan::{AcquiredImage, Swapchain, VulkanDevice, VulkanInstance, WgpuBridge};
-   |                  ^^^^^^^^^^^^^  ^^^^^^^^^ no `Swapchain` in `vulkan`
-   |                  |
-   |                  no `AcquiredImage` in `vulkan`
-   |                  help: a similar name exists in the module: `AcquiredFrame`
-   |
-   = help: consider importing this variant instead:
-           crate::PalError::Swapchain
 
-For more information about this error, try `rustc --explain E0432`.
-error: could not compile `nitrate-pal` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-error: could not compile `nitrate-pal` (lib test) due to 1 previous error
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 4 tests
+test color_metadata_defaults ... ok
+test sync_tier_cpu_blocking ... ok
+test plane_descriptor_defaults ... ok
+test sync_tier_descriptions ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+   Compiling nitrate-pal v0.1.0 (/home/juno/nitrate/crates/nitrate-pal)
+   Compiling nitrate-app v0.1.0 (/home/juno/nitrate/crates/nitrate-app)
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.56s
+     Running unittests src/main.rs (target/debug/deps/nitrate-db265e04ada05349)
+     Running unittests src/bin/spike1.rs (target/debug/deps/spike1-784ceec3551dcb52)
+     Running unittests src/lib.rs (target/debug/deps/nitrate_pal-38f350d7a3ecb507)
+     Running tests/vulkan_tests.rs (target/debug/deps/vulkan_tests-10995f2afa03a21f)
+   Doc-tests nitrate_pal
 
 
 >>> COMMAND: slopchop scan --locality

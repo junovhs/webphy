@@ -3,10 +3,7 @@
 //! Handles the display of rendered images to the screen.
 
 mod engine;
-mod handle;
 mod images;
 mod sync;
-mod types;
 
-pub use engine::PresentationEngine;
-pub use types::{AcquiredFrame, PresentationConfig};
+pub use engine::{AcquiredFrame, PresentationConfig, PresentationEngine};

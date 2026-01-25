@@ -40,46 +40,6 @@ struct SpikeApp {
     session: Option<Session>,
 }
 
-impl ApplicationHandler for SpikeApp {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if self.session.is_none() {
-            match Session::new(event_loop) {
-                Ok(session) => self.session = Some(session),
-                Err(e) => {
-                    error!("Failed to create session: {e}");
-                    event_loop.exit();
-                }
-            }
-        }
-    }
-
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        _window_id: WindowId,
-        event: WindowEvent,
-    ) {
-        match event {
-            WindowEvent::CloseRequested => {
-                if let Some(session) = self.session.as_mut() {
-                    session.destroy();
-                }
-                event_loop.exit();
-            }
-            WindowEvent::RedrawRequested => {
-                if let Some(session) = self.session.as_mut() {
-                    if let Err(e) = session.render() {
-                        error!("Render failed: {e}");
-                        event_loop.exit();
-                    }
-                    session.window.request_redraw();
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
 struct Session {
     window: Arc<Window>,
     instance: VulkanInstance,

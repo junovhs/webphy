@@ -1,0 +1,11 @@
+{"timestamp":1769304039,"kind":"apply_started"}
+{"timestamp":1769304039,"kind":{"apply_succeeded":{"files_written":9,"files_deleted":0}}}
+{"timestamp":1769304039,"kind":"check_started"}
+{"timestamp":1769304039,"kind":{"check_failed":{"exit_code":101}}}
+{"timestamp":1769304041,"kind":{"check_failed":{"exit_code":101}}}
+{"timestamp":1769304301,"kind":"apply_started"}
+{"timestamp":1769304301,"kind":{"apply_succeeded":{"files_written":2,"files_deleted":0}}}
+{"timestamp":1769304301,"kind":"check_started"}
+{"timestamp":1769304303,"kind":{"check_failed":{"exit_code":101}}}
+{"timestamp":1769304348,"kind":"check_started"}
+{"timestamp":1769304352,"kind":"check_passed"}
