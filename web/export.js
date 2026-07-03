@@ -187,10 +187,10 @@ function setupPipelineExport(api) {
       : `Encoding: Frame ${frameIndex}`;
   });
 
-  window.electronAPI.onExportComplete(({ success, outputPath, error }) => {
+  window.electronAPI.onExportComplete(({ success, outputPath, grainKit, error }) => {
     $('#overlay')?.classList.add('hidden');
     if (success) {
-      api.toast('Video exported successfully');
+      api.toast(grainKit ? 'Video exported with performant grain kit' : 'Video exported successfully');
     } else if (error) {
       api.toast(error, 'err');
     }
@@ -211,13 +211,21 @@ async function exportVideoPipeline(api) {
   $('#overlay')?.classList.remove('hidden');
   const ot = $('#overlayText'); if (ot) ot.textContent = 'Preparing native resolution export…';
 
+  const grainKitParams = api.getAllState();
+  const usePerformantGrain = Math.round(Number(grainKitParams.grainMode) || 0) === 1
+    && Number(grainKitParams.performantGrainAmount) > 0.0005;
+  const cleanExportParams = { ...grainKitParams };
+  if (usePerformantGrain) cleanExportParams.performantGrainAmount = 0;
+
   const result = await window.electronAPI.exportVideoStart({
     inputPath: videoPath,
     width: api.getState('mediaW'),
     height: api.getState('mediaH'),
     fps: 30,
     duration: vid?.duration || api.getState('duration') || 0,
-    params: api.getAllState(),
+    params: cleanExportParams,
+    exportPerformantGrainKit: usePerformantGrain,
+    grainKitParams,
     includeAudio: !!audioState.includeAudio,
     audioVolume: audioState.includeAudio ? Math.max(0, Math.min(1, audioState.volume)) : 0
   });

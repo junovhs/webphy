@@ -264,7 +264,7 @@ export class BloomVignetteOpticsModule {
     const gl = this.gl;
     const prog = this.programs.downsample;
 
-    bindProgram(gl, prog, this.quad, canvasW, canvasH);
+    bindProgram(gl, prog, this.quad, outputFB ? outputFB.w : canvasW, outputFB ? outputFB.h : canvasH);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
@@ -281,7 +281,7 @@ export class BloomVignetteOpticsModule {
     const gl = this.gl;
     const prog = this.programs.blur;
 
-    bindProgram(gl, prog, this.quad, canvasW, canvasH);
+    bindProgram(gl, prog, this.quad, dstFB.w, dstFB.h);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, srcFB.tex);
     gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
@@ -290,7 +290,7 @@ export class BloomVignetteOpticsModule {
     gl.uniform1f(gl.getUniformLocation(prog, "uR"), radius);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    bindProgram(gl, prog, this.quad, canvasW, canvasH);
+    bindProgram(gl, prog, this.quad, srcFB.w, srcFB.h);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, dstFB.tex);
     gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
@@ -304,7 +304,7 @@ export class BloomVignetteOpticsModule {
     const gl = this.gl;
     const prog = this.programs.upsampleAdd;
 
-    bindProgram(gl, prog, this.quad, canvasW, canvasH);
+    bindProgram(gl, prog, this.quad, outputFB ? outputFB.w : canvasW, outputFB ? outputFB.h : canvasH);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, lowTex);

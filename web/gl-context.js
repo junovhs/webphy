@@ -110,14 +110,17 @@ export function compileShader(gl, type, source) {
 
 export function bindProgram(gl, program, quad, canvasWidth, canvasHeight) {
   gl.useProgram(program);
+  gl.viewport(0, 0, Math.max(1, canvasWidth | 0), Math.max(1, canvasHeight | 0));
   
   const posLoc = gl.getAttribLocation(program, 'a_pos');
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
-  gl.enableVertexAttribArray(posLoc);
-  gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+  if (posLoc >= 0) {
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+  }
   
   const resLoc = gl.getUniformLocation(program, 'uRes');
-  if (resLoc) {
+  if (resLoc !== null) {
     gl.uniform2f(resLoc, canvasWidth, canvasHeight);
   }
 }

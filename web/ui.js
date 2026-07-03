@@ -8,7 +8,6 @@ export function initUI(api) {
   setupTabs();
   bindControls(api);
   setupCanvasInteraction(api);
-  // setupFlashPad is no longer needed
 }
 
 function generateControls(api) {
@@ -47,7 +46,6 @@ function generateControls(api) {
   tabContent.querySelector('.tab-pane').classList.add('active');
 }
 
-// MODIFIED FUNCTION
 function createFlashPadControl() {
   const el = document.createElement('div');
   el.className = 'control';
@@ -67,23 +65,43 @@ function createFlashPadControl() {
   return el;
 }
 
+
+function formatValue(api, config, value) {
+  return config.special === 'shutter'
+    ? api.formatShutterSpeed(value)
+    : api.formatParamValue(value, config);
+}
+
 function createParamControl(key, config, api) {
   const el = document.createElement('div');
   el.className = 'control';
+  el.dataset.param = key;
+  if (config.grainMode) el.dataset.grainMode = config.grainMode;
   
   const value = api.getState(key);
-  const displayValue = config.special === 'shutter' ? 
-    api.formatShutterSpeed(value) : 
-    api.formatParamValue(value, config.step);
+  const displayValue = formatValue(api, config, value);
   
-  el.innerHTML = `
-    <div class="control-header">
-      <span class="control-label">${config.label}</span>
-      <span class="control-value" data-for="${key}">${displayValue}</span>
-    </div>
-    <input type="range" id="${key}" min="${config.min}" max="${config.max}" 
-           step="${config.step}" value="${value}">
-  `;
+  if (Array.isArray(config.options)) {
+    const options = config.options.map((label, index) =>
+      `<option value="${index}" ${Math.round(value) === index ? 'selected' : ''}>${label}</option>`
+    ).join('');
+    el.innerHTML = `
+      <div class="control-header">
+        <span class="control-label">${config.label}</span>
+        <span class="control-value" data-for="${key}">${displayValue}</span>
+      </div>
+      <select class="control-select" id="${key}">${options}</select>
+    `;
+  } else {
+    el.innerHTML = `
+      <div class="control-header">
+        <span class="control-label">${config.label}</span>
+        <span class="control-value" data-for="${key}">${displayValue}</span>
+      </div>
+      <input type="range" id="${key}" min="${config.min}" max="${config.max}" 
+             step="${config.step}" value="${value}">
+    `;
+  }
   
   return el;
 }
@@ -104,18 +122,32 @@ function bindControls(api) {
     const el = $(`#${key}`);
     if (!el) return;
     
-    el.addEventListener('input', e => {
+    const eventName = Array.isArray(config.options) ? 'change' : 'input';
+    el.addEventListener(eventName, e => {
       const value = parseFloat(e.target.value);
       api.setState(key, value);
       
       const lbl = $(`.control-value[data-for="${key}"]`);
-      if (lbl) {
-        lbl.textContent = config.special === 'shutter' ? 
-          api.formatShutterSpeed(value) : 
-          api.formatParamValue(value, config.step);
-      }
+      if (lbl) lbl.textContent = formatValue(api, config, value);
+
+      if (key === 'grainMode') refreshConditionalControls(api);
     });
   });
+
+  refreshConditionalControls(api);
+}
+
+function refreshConditionalControls(api) {
+  const grainMode = Math.round(Number(api.getState('grainMode')) || 0) === 1 ? 'performant' : 'baked';
+
+  document.querySelectorAll('[data-grain-mode]').forEach(el => {
+    const visible = el.dataset.grainMode === grainMode;
+    el.classList.toggle('hidden-control', !visible);
+  });
+
+  const pane = document.querySelector('[data-pane="grain"]');
+  if (!pane) return;
+  pane.dataset.activeGrainMode = grainMode;
 }
 
 // REMOVED setupFlashPad() function
@@ -124,7 +156,6 @@ function setupCanvasInteraction(api) {
   const canvas = $('#gl');
   
   const updateFlashFromCanvas = (cx, cy) => {
-    // This logic now implicitly updates the state. No need to update a dot.
     const r = canvas.getBoundingClientRect();
     const fx = (cx - r.left) / r.width;
     const fy = (cy - r.top) / r.height;

@@ -14,21 +14,20 @@ function setupFileInput(api) {
     const file = e.target.files[0];
     if (!file) return;
     
-    // *** THIS IS THE DEFINITIVE FIX ***
     const exportBtn = $('#export-btn');
     const isVideo = (file.type || '').startsWith('video/');
     
     if (isVideo) {
       api.loadVideo(file);
       $('#transport-bar').classList.remove('hidden');
-      if (exportBtn) exportBtn.textContent = 'Export MP4'; // Directly set the text here
+      if (exportBtn) exportBtn.textContent = 'Export MP4';
       if (typeof window.electronAPI !== 'undefined' && file.path) {
         api.setState('sourceVideoPath', file.path);
       }
     } else {
       api.loadImage(file);
       $('#transport-bar').classList.add('hidden');
-      if (exportBtn) exportBtn.textContent = 'Export Image'; // And here for images
+      if (exportBtn) exportBtn.textContent = 'Export Image';
     }
   });
 }
@@ -123,8 +122,11 @@ function setupResetButton(api) {
       if (lbl) {
         lbl.textContent = config.special === 'shutter' ? 
           api.formatShutterSpeed(config.default) : 
-          api.formatParamValue(config.default, config.step);
+          api.formatParamValue(config.default, config);
       }
     });
+
+    const grainMode = $('#grainMode');
+    if (grainMode) grainMode.dispatchEvent(new Event('change', { bubbles: true }));
   };
 }

@@ -1,75 +1,177 @@
-// ===== START OF FILE: webphy/web/modules/film-grain.js ===== //
-// Enhanced Film Grain Module
-// Based on AOMedia AV1 film grain synthesis research
-// Resolution-normalized with authentic intensity scaling
+// Film Grain Studio Module
+// Baked grain remains available for final-pixel exports.
+// Performant grain previews the low-cost overlay kit that is exported next to the video.
 
-import { compileShader, bindProgram } from "../gl-context.js";
+import { compileShader, bindProgram } from '../gl-context.js';
 
 export const GRAIN_PARAMS = {
+  grainMode: {
+    min: 0,
+    max: 1,
+    step: 1,
+    default: 0,
+    label: 'Grain Mode',
+    options: ['Baked Grain', 'Performant Grain'],
+  },
+
+  // Baked pixel grain controls.
+  grainAmount: {
+    min: 0,
+    max: 3,
+    step: 0.01,
+    default: 0,
+    label: 'Grain Amount',
+    grainMode: 'baked',
+  },
   filmSpeed: {
     min: 100,
     max: 3200,
     step: 50,
-    default: 100,
-    label: "Film Speed (ISO)",
+    default: 400,
+    label: 'Texture ISO',
+    grainMode: 'baked',
+  },
+  grainSize: {
+    min: 0.35,
+    max: 4,
+    step: 0.01,
+    default: 1.0,
+    label: 'Grain Size',
+    grainMode: 'baked',
+  },
+  grainPrickliness: {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0.35,
+    label: 'Prickliness',
+    grainMode: 'baked',
   },
   grainCharacter: {
     min: 0,
     max: 1,
     step: 0.01,
-    default: 0.0,
-    label: "Grain Character",
+    default: 0.45,
+    label: 'Organic Texture',
+    grainMode: 'baked',
   },
   grainChroma: {
     min: 0,
     max: 1,
     step: 0.01,
-    default: 0.0,
-    label: "Color Grain",
+    default: 0.08,
+    label: 'Color Grain',
+    grainMode: 'baked',
   },
-};
+  grainShadowBias: {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0.55,
+    label: 'Shadow Bias',
+    grainMode: 'baked',
+  },
+  grainHighlightProtect: {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0.7,
+    label: 'Highlight Protect',
+    grainMode: 'baked',
+  },
+  grainNoiseType: {
+    min: 0,
+    max: 3,
+    step: 1,
+    default: 0,
+    label: 'Noise Recipe',
+    options: ['Organic', 'Fine Gaussian', 'Clumped', 'Prickly'],
+    grainMode: 'baked',
+  },
+  grainAnimateStill: {
+    min: 0,
+    max: 1,
+    step: 1,
+    default: 1,
+    label: 'Animate Stills',
+    options: ['Off', 'On'],
+    grainMode: 'baked',
+  },
+  grainFps: {
+    min: 1,
+    max: 60,
+    step: 1,
+    default: 24,
+    label: 'Grain FPS',
+    grainMode: 'baked',
+  },
 
-// Reference resolution for grain consistency
-const REFERENCE_HEIGHT = 1080;
-
-// Film speed presets (ISO → grain strength curves)
-const INTENSITY_CURVES = {
-  // Format: [luma_value, grain_strength] pairs
-  100: [
-    [0, 0.02],
-    [40, 0.015],
-    [128, 0.008],
-    [200, 0.005],
-    [255, 0.003],
-  ],
-  400: [
-    [0, 0.05],
-    [40, 0.04],
-    [128, 0.025],
-    [200, 0.015],
-    [255, 0.01],
-  ],
-  800: [
-    [0, 0.12],
-    [40, 0.1],
-    [128, 0.06],
-    [200, 0.04],
-    [255, 0.03],
-  ],
-  1600: [
-    [0, 0.2],
-    [40, 0.16],
-    [128, 0.1],
-    [200, 0.07],
-    [255, 0.055],
-  ],
-  3200: [
-    [0, 0.32],
-    [40, 0.26],
-    [128, 0.16],
-    [200, 0.12],
-    [255, 0.095],
-  ],
+  // Low-cost overlay kit controls.
+  performantGrainAmount: {
+    min: 0,
+    max: 0.22,
+    step: 0.001,
+    default: 0.065,
+    label: 'Overlay Amount',
+    grainMode: 'performant',
+  },
+  performantGrainScale: {
+    min: 0.5,
+    max: 4,
+    step: 0.01,
+    default: 1.15,
+    label: 'Texture Scale',
+    grainMode: 'performant',
+  },
+  performantGrainContrast: {
+    min: 0.2,
+    max: 2.5,
+    step: 0.01,
+    default: 1.1,
+    label: 'Texture Contrast',
+    grainMode: 'performant',
+  },
+  performantGrainPrickliness: {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0.38,
+    label: 'Prickliness',
+    grainMode: 'performant',
+  },
+  performantGrainSoftness: {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0.18,
+    label: 'Softness',
+    grainMode: 'performant',
+  },
+  performantGrainMotion: {
+    min: 0,
+    max: 1,
+    step: 0.01,
+    default: 0.65,
+    label: 'Motion Jitter',
+    grainMode: 'performant',
+  },
+  performantGrainFps: {
+    min: 1,
+    max: 30,
+    step: 1,
+    default: 12,
+    label: 'Animation FPS',
+    grainMode: 'performant',
+  },
+  performantGrainTile: {
+    min: 0,
+    max: 2,
+    step: 1,
+    default: 1,
+    label: 'Texture Resolution',
+    options: ['128 px', '256 px', '512 px'],
+    grainMode: 'performant',
+  },
 };
 
 const VERTEX_SHADER = `
@@ -77,7 +179,7 @@ attribute vec2 a_pos;
 varying vec2 v_uv;
 void main() {
   v_uv = a_pos * 0.5 + 0.5;
-  gl_Position = vec4(a_pos, 0, 1);
+  gl_Position = vec4(a_pos, 0.0, 1.0);
 }
 `;
 
@@ -86,19 +188,29 @@ precision highp float;
 varying vec2 v_uv;
 uniform sampler2D uTex;
 uniform vec2 uRes;
-uniform float uCharacter, uChroma, uSeed, uResScale;
-uniform float uIntensityCurve[10]; // 5 points x 2 values (luma, strength)
-
-// Better color space
-vec3 toLinear(vec3 s) {
-  return mix(s / 12.92, pow((s + 0.055) / 1.055, vec3(2.4)), step(0.04045, s));
-}
+uniform float uMode;
+uniform float uAmount;
+uniform float uIso;
+uniform float uSize;
+uniform float uPrickliness;
+uniform float uCharacter;
+uniform float uChroma;
+uniform float uShadowBias;
+uniform float uHighlightProtect;
+uniform float uNoiseType;
+uniform float uSeed;
+uniform float uPerfAmount;
+uniform float uPerfScale;
+uniform float uPerfContrast;
+uniform float uPerfPrickliness;
+uniform float uPerfSoftness;
+uniform float uPerfMotion;
 
 vec3 toSRGB(vec3 l) {
-  return mix(l * 12.92, pow(l, vec3(1.0/2.4)) * 1.055 - 0.055, step(0.0031308, l));
+  l = max(l, 0.0);
+  return mix(l * 12.92, pow(l, vec3(1.0 / 2.4)) * 1.055 - 0.055, step(0.0031308, l));
 }
 
-// High-quality hash
 float hash1(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
   p3 += dot(p3, p3.yzx + 33.33);
@@ -111,197 +223,162 @@ vec2 hash2(vec2 p) {
   return fract((p3.xx + p3.yz) * p3.zy);
 }
 
-vec3 hash3(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
-  p3 += dot(p3, p3.yxz + 33.33);
-  return fract((p3.xxy + p3.yzz) * p3.zyx);
+float signedPow(float v, float p) {
+  return sign(v) * pow(abs(v), p);
 }
 
-// Autoregressive grain (from AV1 paper)
-float arGrain(vec2 p, float seed, float character) {
-  float n = hash1(p + seed) - 0.5;
-
-  // AR coefficients depend on character (lag parameter)
-  float a0 = mix(0.85, 0.6, character);
-  float a1 = mix(0.08, 0.25, character);
-
-  float g_left = (hash1(p + vec2(-1, 0) + seed) - 0.5);
-  float g_up = (hash1(p + vec2(0, -1) + seed) - 0.5);
-
-  return a0 * n + a1 * (g_left + g_up);
-}
-
-// Gradient noise for variation
 float gradNoise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
-  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
-
+  vec2 u = f * f * (3.0 - 2.0 * f);
   vec2 ga = hash2(i + vec2(0.0, 0.0)) * 2.0 - 1.0;
   vec2 gb = hash2(i + vec2(1.0, 0.0)) * 2.0 - 1.0;
   vec2 gc = hash2(i + vec2(0.0, 1.0)) * 2.0 - 1.0;
   vec2 gd = hash2(i + vec2(1.0, 1.0)) * 2.0 - 1.0;
-
   float va = dot(ga, f - vec2(0.0, 0.0));
   float vb = dot(gb, f - vec2(1.0, 0.0));
   float vc = dot(gc, f - vec2(0.0, 1.0));
   float vd = dot(gd, f - vec2(1.0, 1.0));
-
-  return mix(mix(va, vb, u.x), mix(vc, vd, u.x), u.y);
+  return mix(mix(va, vb, u.x), mix(vc, vd, u.x), u.y) * 1.8;
 }
 
-// Worley for shadow clumping
+float gaussianNoise(vec2 p, float seed) {
+  float s = 0.0;
+  s += hash1(p + seed + 0.11);
+  s += hash1(p * 1.37 + seed + 9.73);
+  s += hash1(p * 1.91 + seed + 23.41);
+  s += hash1(p * 2.53 + seed + 47.19);
+  return (s - 2.0) * 0.75;
+}
+
+float arGrain(vec2 p, float seed, float character) {
+  float n = hash1(p + seed) - 0.5;
+  float left = hash1(p + vec2(-1.0, 0.0) + seed) - 0.5;
+  float up = hash1(p + vec2(0.0, -1.0) + seed) - 0.5;
+  float diag = hash1(p + vec2(-1.0, -1.0) + seed) - 0.5;
+  float center = mix(0.95, 0.62, character);
+  float neighbor = mix(0.03, 0.20, character);
+  return center * n + neighbor * (left + up) + neighbor * 0.45 * diag;
+}
+
 float worley(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
-  float minDist = 1.0;
-
-  for (int x = -1; x <= 1; x++) {
-    for (int y = -1; y <= 1; y++) {
-      vec2 neighbor = vec2(float(x), float(y));
-      vec2 point = hash2(i + neighbor);
-      vec2 diff = neighbor + point - f;
-      minDist = min(minDist, length(diff));
+  float d = 1.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 n = vec2(float(x), float(y));
+      vec2 pt = hash2(i + n);
+      d = min(d, length(n + pt - f));
     }
   }
-
-  return minDist;
+  return d;
 }
 
-// Multi-octave grain synthesis
-float grainLayer(vec2 p, float seed, float character) {
-  float sum = 0.0;
-  float amp = 0.5;
+float organicLayer(vec2 p, float seed, float character, float prickly) {
+  vec2 offset = hash2(vec2(seed, seed * 1.37)) * 200.0;
+  p += offset;
+
+  float n = 0.0;
+  float amp = 0.64;
   float freq = 1.0;
-
-  vec2 offset = hash2(vec2(seed, seed * 1.234)) * 100.0;
-  vec2 jitter = (hash2(vec2(seed * 0.1234, seed * 0.5678)) - 0.5) * 0.8;
-  p += offset + jitter;
-
-  for (int i = 0; i < 3; i++) {
-    float ar = arGrain(p * freq, seed + float(i), character);
-    float grad = gradNoise(p * freq * 1.3);
-    float n = mix(grad, ar, character);
-
-    sum += amp * n;
-    freq *= 2.1;
-    amp *= 0.5;
+  for (int i = 0; i < 4; i++) {
+    float ar = arGrain(p * freq, seed + float(i) * 13.13, character);
+    float gr = gradNoise(p * freq * 0.83 + seed);
+    n += amp * mix(gr, ar, 0.65 + character * 0.35);
+    freq *= mix(1.75, 2.35, prickly);
+    amp *= mix(0.46, 0.62, prickly);
   }
-
-  return sum;
+  return n;
 }
 
-// Piece-wise linear lookup (from AV1 paper Section 4)
-float lookupIntensity(float luma) {
-  // Binary search would be more efficient, but 5 points is fine for linear
-  for (int i = 0; i < 4; i++) {
-    float x0 = uIntensityCurve[i * 2];
-    float y0 = uIntensityCurve[i * 2 + 1];
-    float x1 = uIntensityCurve[(i + 1) * 2];
-    float y1 = uIntensityCurve[(i + 1) * 2 + 1];
+float recipeNoise(vec2 p, float seed, float recipe, float character, float prickly) {
+  float organic = organicLayer(p, seed, character, prickly);
+  float fine = gaussianNoise(floor(p * mix(1.0, 1.7, prickly)), seed);
 
-    if (luma >= x0 && luma <= x1) {
-      float t = (luma - x0) / (x1 - x0);
-      return mix(y0, y1, t);
-    }
-  }
+  float clump = worley(p * 0.48 + hash2(vec2(seed)) * 30.0);
+  clump = (1.0 - smoothstep(0.12, 0.88, clump)) * 2.0 - 1.0;
+  clump = mix(organic, clump, 0.48 + 0.35 * character);
 
-  // Fallback (shouldn't reach here)
-  return uIntensityCurve[9]; // last strength value
+  float saltSeed = hash1(floor(p * 1.15) + seed * 37.0);
+  float threshold = mix(0.9975, 0.982, prickly);
+  float salt = step(threshold, saltSeed) * sign(hash1(p + seed * 7.7) - 0.5);
+  float biting = mix(fine, signedPow(fine, 0.54), 0.65) + salt * 1.75;
+
+  if (recipe < 0.5) return organic;
+  if (recipe < 1.5) return fine;
+  if (recipe < 2.5) return clump;
+  return biting;
+}
+
+vec3 applyPerformantOverlay(vec3 displayColor) {
+  float scale = max(0.5, uPerfScale);
+  vec2 jitter = (hash2(vec2(uSeed * 19.1, uSeed * 3.7)) - 0.5) * uPerfMotion * 180.0;
+  vec2 p = floor((v_uv * uRes + jitter) / scale);
+
+  float n = gaussianNoise(p, uSeed * 17.0 + 11.0);
+  float saltSeed = hash1(p * 1.7 + uSeed * 31.0);
+  float saltThreshold = mix(0.9992, 0.979, clamp(uPerfPrickliness, 0.0, 1.0));
+  float salt = step(saltThreshold, saltSeed) * sign(hash1(p + uSeed * 71.0) - 0.5) * 1.75;
+  n = signedPow(n, mix(1.85, 0.48, clamp(uPerfPrickliness, 0.0, 1.0))) + salt;
+
+  float alphaShape = mix(1.9, 0.72, clamp(uPerfPrickliness, 0.0, 1.0));
+  alphaShape = mix(alphaShape, 2.5, clamp(uPerfSoftness, 0.0, 1.0));
+  float a = pow(clamp(abs(n) * max(0.05, uPerfContrast), 0.0, 1.0), alphaShape);
+  a *= clamp(uPerfAmount, 0.0, 0.35);
+
+  vec3 ink = n >= 0.0 ? vec3(1.0) : vec3(0.0);
+  return mix(displayColor, ink, a);
 }
 
 void main() {
-  vec3 color = texture2D(uTex, v_uv).rgb;
-  vec3 linear = toLinear(color);
-  float luma = dot(linear, vec3(0.2126, 0.7152, 0.0722));
+  vec3 linear = texture2D(uTex, v_uv).rgb;
 
-  // Resolution-normalized grain coordinate (CRITICAL for consistency)
-  // Base grain size scaled by resolution relative to 1080p reference
-  float baseGrainSize = 1.2 * uResScale;
-  vec2 grainUV = (v_uv * uRes) / baseGrainSize;
+  if (uMode > 0.5) {
+    vec3 displayColor = toSRGB(linear);
+    gl_FragColor = vec4(clamp(applyPerformantOverlay(displayColor), 0.0, 1.0), 1.0);
+    return;
+  }
 
-  // Lookup intensity scaling from piece-wise linear curve
-  float lumaScaled = luma * 255.0;
-  float intensityScale = lookupIntensity(lumaScaled);
+  float y = dot(linear, vec3(0.2126, 0.7152, 0.0722));
 
-  // Luminance-dependent response (preserve midtone contrast)
-  float midtones = 1.0 - pow(abs(luma - 0.5) * 2.0, 1.5);
-  midtones = mix(0.3, 1.0, midtones);
+  float iso01 = clamp(log2(max(uIso, 100.0) / 100.0) / 5.0, 0.0, 1.0);
+  float resScale = max(0.5, uRes.y / 1080.0);
+  float grainPitch = max(0.25, uSize * resScale);
+  vec2 p = v_uv * uRes / grainPitch;
 
-  float shadows = smoothstep(0.35, 0.0, luma);
-  float highlights = smoothstep(0.8, 1.0, luma);
+  float lumaNoise = recipeNoise(p, uSeed, uNoiseType, uCharacter, uPrickliness);
+  float grit = signedPow(lumaNoise, mix(1.35, 0.55, uPrickliness));
+  lumaNoise = mix(lumaNoise, grit, uPrickliness);
 
-  // Generate luma grain
-  float lumaGrain = grainLayer(grainUV, uSeed, uCharacter);
-
-  // Shadow clumping (characteristic of film grain and underexposed sensors)
-  float clumps = worley(grainUV * 0.6 + hash2(vec2(uSeed)) * 10.0);
-  clumps = (clumps * 2.0 - 1.0) * 0.7;
-  lumaGrain = mix(lumaGrain, clumps, shadows * uCharacter * 0.6);
-
-  // Chromatic grain (looser AR correlation as per paper)
-  vec3 chromaGrain = vec3(
-    grainLayer(grainUV * 0.85 + vec2(12.34, 56.78), uSeed * 1.1, uCharacter * 0.7),
-    grainLayer(grainUV * 0.85 + vec2(91.01, 23.45), uSeed * 1.2, uCharacter * 0.7),
-    grainLayer(grainUV * 0.85 + vec2(67.89, 34.56), uSeed * 1.3, uCharacter * 0.7)
+  vec3 chromaNoise = vec3(
+    recipeNoise(p * 0.91 + vec2(17.1, 43.7), uSeed * 1.11 + 7.0, uNoiseType, uCharacter * 0.75, uPrickliness),
+    recipeNoise(p * 0.88 + vec2(81.4, 12.9), uSeed * 1.23 + 19.0, uNoiseType, uCharacter * 0.75, uPrickliness),
+    recipeNoise(p * 0.93 + vec2(35.8, 67.2), uSeed * 1.37 + 31.0, uNoiseType, uCharacter * 0.75, uPrickliness)
   );
 
-  vec3 grain = mix(vec3(lumaGrain), chromaGrain, uChroma);
+  vec3 grain = mix(vec3(lumaNoise), chromaNoise, uChroma);
 
-  // Apply intensity scaling from LUT
-  float intensity = intensityScale;
-  intensity *= midtones;
-  intensity *= (1.0 - highlights * 0.6);
-  intensity *= (1.0 + shadows * 0.4);
+  float shadows = 1.0 - smoothstep(0.08, 0.55, y);
+  float mids = 1.0 - pow(clamp(abs(y - 0.42) * 2.1, 0.0, 1.0), 1.35);
+  float highs = smoothstep(0.62, 1.0, y);
+  float response = mix(0.55, 1.15, mids);
+  response *= 1.0 + shadows * uShadowBias * 0.85;
+  response *= 1.0 - highs * uHighlightProtect * 0.82;
 
-  // Density modulation (as per paper equation 2)
-  vec3 grainedLinear = linear + (grain * intensity);
-  grainedLinear = max(grainedLinear, 0.0);
+  float baseStrength = mix(0.006, 0.052, iso01);
+  float strength = uAmount * baseStrength * response;
 
-  // Output
-  vec3 finalColor = toSRGB(grainedLinear);
+  vec3 densityScale = 0.55 + sqrt(max(linear, 0.0));
+  vec3 grained = linear + grain * strength * densityScale;
 
-  // Dithering
-  vec2 ditherJitter = hash2(v_uv * uRes + vec2(uSeed * 123.45));
-  float dither = (ditherJitter.x - 0.5) / 255.0;
-  finalColor += dither;
-
+  vec3 finalColor = toSRGB(grained);
   gl_FragColor = vec4(clamp(finalColor, 0.0, 1.0), 1.0);
 }
 `;
 
-function interpolateCurve(iso) {
-  // Find surrounding ISO values
-  const isoValues = [100, 400, 800, 1600, 3200];
-
-  if (iso <= 100) return INTENSITY_CURVES[100];
-  if (iso >= 3200) return INTENSITY_CURVES[3200];
-
-  // Find bracketing values
-  let lower = 100,
-    upper = 400;
-  for (let i = 0; i < isoValues.length - 1; i++) {
-    if (iso >= isoValues[i] && iso <= isoValues[i + 1]) {
-      lower = isoValues[i];
-      upper = isoValues[i + 1];
-      break;
-    }
-  }
-
-  // Linear interpolation between curves
-  const t = (iso - lower) / (upper - lower);
-  const lowerCurve = INTENSITY_CURVES[lower];
-  const upperCurve = INTENSITY_CURVES[upper];
-
-  const result = [];
-  for (let i = 0; i < lowerCurve.length; i++) {
-    result.push([
-      lowerCurve[i][0], // luma value (same for all ISOs)
-      lowerCurve[i][1] * (1 - t) + upperCurve[i][1] * t, // interpolated strength
-    ]);
-  }
-
-  return result;
+function uniform(gl, program, name) {
+  return gl.getUniformLocation(program, name);
 }
 
 export class FilmGrainModule {
@@ -322,50 +399,49 @@ export class FilmGrainModule {
     gl.linkProgram(program);
 
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-      console.error("Grain program link error:", gl.getProgramInfoLog(program));
+      console.error('Grain program link error:', gl.getProgramInfoLog(program));
       return null;
     }
 
     return program;
   }
 
-  apply(inputTex, params, time, frameSeed, canvasW, canvasH) {
+  apply(inputTex, outputFB, params, timeMs, frameSeed, canvasW, canvasH) {
     const gl = this.gl;
+    const mode = Math.round(Number(params.grainMode) || 0);
+    const amount = Math.max(0, Number(params.grainAmount) || 0);
+    const perfAmount = Math.max(0, Number(params.performantGrainAmount) || 0);
 
     bindProgram(gl, this.program, this.quad, canvasW, canvasH);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, inputTex);
-    gl.uniform1i(gl.getUniformLocation(this.program, "uTex"), 0);
+    gl.uniform1i(uniform(gl, this.program, 'uTex'), 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outputFB ? outputFB.fbo : null);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const stableSeed = (Number(frameSeed) || 0) + Math.floor((Number(timeMs) || 0) * 0.0001) * 0.001;
 
-    // Resolution normalization (key for consistency)
-    const resolutionScale = canvasH / REFERENCE_HEIGHT;
-    gl.uniform1f(
-      gl.getUniformLocation(this.program, "uResScale"),
-      resolutionScale,
-    );
+    gl.uniform2f(uniform(gl, this.program, 'uRes'), canvasW, canvasH);
+    gl.uniform1f(uniform(gl, this.program, 'uMode'), mode);
 
-    // Get intensity curve for current film speed
-    const curve = interpolateCurve(params.filmSpeed);
-    const curveFlat = curve.flat(); // [luma0, strength0, luma1, strength1, ...]
-    gl.uniform1fv(
-      gl.getUniformLocation(this.program, "uIntensityCurve"),
-      curveFlat,
-    );
+    gl.uniform1f(uniform(gl, this.program, 'uAmount'), amount);
+    gl.uniform1f(uniform(gl, this.program, 'uIso'), Number(params.filmSpeed) || 400);
+    gl.uniform1f(uniform(gl, this.program, 'uSize'), Math.max(0.25, Number(params.grainSize) || 1));
+    gl.uniform1f(uniform(gl, this.program, 'uPrickliness'), Number(params.grainPrickliness) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uCharacter'), Number(params.grainCharacter) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uChroma'), Number(params.grainChroma) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uShadowBias'), Number(params.grainShadowBias) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uHighlightProtect'), Number(params.grainHighlightProtect) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uNoiseType'), Math.round(Number(params.grainNoiseType) || 0));
 
-    gl.uniform1f(
-      gl.getUniformLocation(this.program, "uCharacter"),
-      params.grainCharacter,
-    );
-    gl.uniform1f(
-      gl.getUniformLocation(this.program, "uChroma"),
-      params.grainChroma,
-    );
-    gl.uniform1f(gl.getUniformLocation(this.program, "uSeed"), frameSeed);
+    gl.uniform1f(uniform(gl, this.program, 'uPerfAmount'), perfAmount);
+    gl.uniform1f(uniform(gl, this.program, 'uPerfScale'), Math.max(0.5, Number(params.performantGrainScale) || 1));
+    gl.uniform1f(uniform(gl, this.program, 'uPerfContrast'), Math.max(0.05, Number(params.performantGrainContrast) || 1));
+    gl.uniform1f(uniform(gl, this.program, 'uPerfPrickliness'), Number(params.performantGrainPrickliness) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uPerfSoftness'), Number(params.performantGrainSoftness) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uPerfMotion'), Number(params.performantGrainMotion) || 0);
+    gl.uniform1f(uniform(gl, this.program, 'uSeed'), stableSeed);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 }
-// ===== END OF FILE: webphy/web/modules/film-grain.js ===== //
